@@ -1,0 +1,1496 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="images-page">
+
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">AERIS / IMAGING</p>
+            <h1>Image Analysis</h1>
+            <p class="page-description">
+                Upload spacecraft imagery and extract measurable visual
+                features for image-quality and anomaly investigation.
+            </p>
+        </div>
+
+        <a href="{{ url_for('history.history') }}" class="secondary-button">
+            View history
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="analysis-layout">
+
+        <section class="upload-card">
+
+            <div class="card-heading">
+                <p class="eyebrow">IMAGE INPUT</p>
+                <h2>Upload spacecraft image</h2>
+            </div>
+
+            <p class="card-description">
+                Select a supported image file. AERIS analyzes measurable
+                image characteristics such as brightness, contrast,
+                sharpness, edges, and basic image quality indicators.
+            </p>
+
+            <form
+                method="POST"
+                action="{{ url_for('images.analyze') }}"
+                enctype="multipart/form-data"
+                id="imageForm"
+            >
+
+                <label
+                    for="imageFile"
+                    class="drop-zone"
+                    id="dropZone"
+                >
+                    <input
+                        type="file"
+                        id="imageFile"
+                        name="file"
+                        accept=".png,.jpg,.jpeg,.bmp,.tif,.tiff"
+                        hidden
+                        required
+                    >
+
+                    <div class="upload-icon">
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="25"
+                            height="25"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <rect
+                                x="3"
+                                y="4"
+                                width="18"
+                                height="16"
+                                rx="2"
+                            />
+                            <circle cx="8.5" cy="9" r="1.5" />
+                            <path d="M21 16l-5-5-7 7" />
+                        </svg>
+                    </div>
+
+                    <div class="drop-title">
+                        Drop image here
+                    </div>
+
+                    <div class="drop-description">
+                        or click to browse from your device
+                    </div>
+
+                    <div class="file-types">
+                        PNG · JPG · JPEG · BMP · TIFF
+                    </div>
+                </label>
+
+                <div
+                    class="image-preview"
+                    id="imagePreview"
+                    hidden
+                >
+                    <div class="preview-image-wrapper">
+                        <img
+                            id="previewImage"
+                            src=""
+                            alt="Selected spacecraft image preview"
+                        >
+                    </div>
+
+                    <div class="preview-details">
+                        <div>
+                            <strong id="imageFileName">
+                                spacecraft-image.jpg
+                            </strong>
+
+                            <span id="imageFileSize">
+                                0 KB
+                            </span>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="remove-file"
+                            id="removeImage"
+                            aria-label="Remove selected image"
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+
+                <div class="analysis-options">
+
+                    <div class="option-heading">
+                        <div>
+                            <h3>Analysis features</h3>
+                            <p>
+                                The analysis uses measurable image
+                                properties rather than fabricated labels.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="feature-grid">
+
+                        <label class="feature-option">
+                            <input
+                                type="checkbox"
+                                name="features"
+                                value="brightness"
+                                checked
+                            >
+
+                            <span>
+                                <strong>Brightness</strong>
+                                <small>
+                                    Mean grayscale intensity
+                                </small>
+                            </span>
+                        </label>
+
+                        <label class="feature-option">
+                            <input
+                                type="checkbox"
+                                name="features"
+                                value="contrast"
+                                checked
+                            >
+
+                            <span>
+                                <strong>Contrast</strong>
+                                <small>
+                                    Intensity variation
+                                </small>
+                            </span>
+                        </label>
+
+                        <label class="feature-option">
+                            <input
+                                type="checkbox"
+                                name="features"
+                                value="sharpness"
+                                checked
+                            >
+
+                            <span>
+                                <strong>Sharpness</strong>
+                                <small>
+                                    Laplacian-based measure
+                                </small>
+                            </span>
+                        </label>
+
+                        <label class="feature-option">
+                            <input
+                                type="checkbox"
+                                name="features"
+                                value="edges"
+                                checked
+                            >
+
+                            <span>
+                                <strong>Edge density</strong>
+                                <small>
+                                    Detected edge proportion
+                                </small>
+                            </span>
+                        </label>
+
+                    </div>
+                </div>
+
+                <div class="analysis-actions">
+                    <button
+                        type="submit"
+                        class="primary-button"
+                        id="analyzeButton"
+                    >
+                        <span id="analyzeButtonText">
+                            Analyze image
+                        </span>
+                    </button>
+                </div>
+
+            </form>
+
+        </section>
+
+        <aside class="info-column">
+
+            <div class="info-card">
+                <p class="eyebrow">SUPPORTED INPUT</p>
+                <h2>Image requirements</h2>
+
+                <ul class="requirements-list">
+                    <li>
+                        <span class="check">✓</span>
+                        <span>
+                            PNG, JPG, JPEG, BMP, or TIFF format
+                        </span>
+                    </li>
+
+                    <li>
+                        <span class="check">✓</span>
+                        <span>
+                            Valid readable image data
+                        </span>
+                    </li>
+
+                    <li>
+                        <span class="check">✓</span>
+                        <span>
+                            Reasonable image dimensions
+                        </span>
+                    </li>
+
+                    <li>
+                        <span class="check">✓</span>
+                        <span>
+                            No executable or unsupported file types
+                        </span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="info-card">
+                <p class="eyebrow">IMAGE PIPELINE</p>
+                <h2>How AERIS analyzes imagery</h2>
+
+                <div class="pipeline">
+
+                    <div class="pipeline-step">
+                        <span class="pipeline-number">01</span>
+
+                        <div>
+                            <strong>Validate</strong>
+                            <span>
+                                Confirm the uploaded file is a valid,
+                                supported image.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-line"></div>
+
+                    <div class="pipeline-step">
+                        <span class="pipeline-number">02</span>
+
+                        <div>
+                            <strong>Preprocess</strong>
+                            <span>
+                                Convert the image into appropriate
+                                grayscale and numerical representations.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-line"></div>
+
+                    <div class="pipeline-step">
+                        <span class="pipeline-number">03</span>
+
+                        <div>
+                            <strong>Extract features</strong>
+                            <span>
+                                Calculate brightness, contrast,
+                                sharpness, and edge-related metrics.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-line"></div>
+
+                    <div class="pipeline-step">
+                        <span class="pipeline-number">04</span>
+
+                        <div>
+                            <strong>Report</strong>
+                            <span>
+                                Present the measured characteristics
+                                without inventing an image diagnosis.
+                            </span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="reference-card">
+                <div class="reference-header">
+                    <span class="reference-label">
+                        ANALYSIS PRINCIPLE
+                    </span>
+
+                    <span class="reference-badge">
+                        REAL FEATURES
+                    </span>
+                </div>
+
+                <h3>Computer vision metrics</h3>
+
+                <p>
+                    AERIS uses image-processing measurements derived
+                    from the uploaded pixels. Results are analytical
+                    indicators and should be interpreted in context.
+                </p>
+            </div>
+
+        </aside>
+
+    </div>
+
+    <section
+        class="results-section"
+        id="resultsSection"
+        {% if not results %}hidden{% endif %}
+    >
+
+        {% if results %}
+
+            <div class="results-header">
+                <div>
+                    <p class="eyebrow">ANALYSIS RESULTS</p>
+                    <h2>Image findings</h2>
+                </div>
+
+                <div class="result-status">
+                    Analysis complete
+                </div>
+            </div>
+
+            <div class="results-layout">
+
+                <div class="result-preview-card">
+
+                    {% if results.image_url %}
+                        <div class="result-image-wrapper">
+                            <img
+                                src="{{ results.image_url }}"
+                                alt="Analyzed spacecraft image"
+                            >
+                        </div>
+                    {% endif %}
+
+                    <div class="result-file-details">
+                        <span>Analyzed file</span>
+
+                        <strong>
+                            {{ results.filename|default("Image") }}
+                        </strong>
+                    </div>
+
+                </div>
+
+                <div class="metrics-card">
+
+                    <div class="metrics-card-header">
+                        <p class="eyebrow">MEASUREMENTS</p>
+                        <h3>Extracted features</h3>
+                    </div>
+
+                    <div class="metrics-grid">
+
+                        {% if results.brightness is defined %}
+                            <div class="metric">
+                                <span>Brightness</span>
+                                <strong>
+                                    {{ "%.3f"|format(results.brightness) }}
+                                </strong>
+                            </div>
+                        {% endif %}
+
+                        {% if results.contrast is defined %}
+                            <div class="metric">
+                                <span>Contrast</span>
+                                <strong>
+                                    {{ "%.3f"|format(results.contrast) }}
+                                </strong>
+                            </div>
+                        {% endif %}
+
+                        {% if results.sharpness is defined %}
+                            <div class="metric">
+                                <span>Sharpness</span>
+                                <strong>
+                                    {{ "%.3f"|format(results.sharpness) }}
+                                </strong>
+                            </div>
+                        {% endif %}
+
+                        {% if results.edge_density is defined %}
+                            <div class="metric">
+                                <span>Edge density</span>
+                                <strong>
+                                    {{ "%.3f"|format(results.edge_density) }}
+                                </strong>
+                            </div>
+                        {% endif %}
+
+                        {% if results.width is defined %}
+                            <div class="metric">
+                                <span>Width</span>
+                                <strong>
+                                    {{ results.width }} px
+                                </strong>
+                            </div>
+                        {% endif %}
+
+                        {% if results.height is defined %}
+                            <div class="metric">
+                                <span>Height</span>
+                                <strong>
+                                    {{ results.height }} px
+                                </strong>
+                            </div>
+                        {% endif %}
+
+                        {% if results.channels is defined %}
+                            <div class="metric">
+                                <span>Channels</span>
+                                <strong>
+                                    {{ results.channels }}
+                                </strong>
+                            </div>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {% if results.explanation %}
+                <div class="explanation-card">
+                    <p class="eyebrow">INTERPRETATION</p>
+                    <h3>What these measurements indicate</h3>
+
+                    <p>
+                        {{ results.explanation }}
+                    </p>
+                </div>
+            {% endif %}
+
+        {% endif %}
+
+    </section>
+
+</div>
+
+<style>
+    .images-page {
+        width: 100%;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 34px 24px 60px;
+        box-sizing: border-box;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 30px;
+    }
+
+    .eyebrow {
+        margin: 0 0 8px;
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        color: #f1f5f9;
+        font-size: 30px;
+        line-height: 1.2;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+    }
+
+    .page-description {
+        max-width: 700px;
+        margin: 10px 0 0;
+        color: #94a3b8;
+        font-size: 14px;
+        line-height: 1.65;
+    }
+
+    .secondary-button,
+    .primary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        box-sizing: border-box;
+        padding: 10px 15px;
+        border-radius: 7px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .secondary-button {
+        flex-shrink: 0;
+        color: #cbd5e1;
+        background: #111827;
+        border: 1px solid #334155;
+    }
+
+    .secondary-button:hover {
+        background: #151e2c;
+        border-color: #475569;
+    }
+
+    .primary-button {
+        width: 100%;
+        color: #ffffff;
+        background: #2563eb;
+        border: 1px solid #3b82f6;
+    }
+
+    .primary-button:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+
+    .primary-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .secondary-button:focus-visible,
+    .primary-button:focus-visible {
+        outline: 2px solid #60a5fa;
+        outline-offset: 2px;
+    }
+
+    .flash-messages {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 22px;
+    }
+
+    .alert {
+        padding: 11px 13px;
+        border: 1px solid #334155;
+        border-radius: 7px;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .alert-success {
+        color: #bbf7d0;
+        background: rgba(22, 101, 52, 0.16);
+        border-color: rgba(34, 197, 94, 0.28);
+    }
+
+    .alert-danger,
+    .alert-error {
+        color: #fecaca;
+        background: rgba(127, 29, 29, 0.16);
+        border-color: rgba(239, 68, 68, 0.28);
+    }
+
+    .alert-warning {
+        color: #fde68a;
+        background: rgba(120, 53, 15, 0.16);
+        border-color: rgba(245, 158, 11, 0.28);
+    }
+
+    .alert-info {
+        color: #bfdbfe;
+        background: rgba(30, 64, 175, 0.16);
+        border-color: rgba(59, 130, 246, 0.28);
+    }
+
+    .analysis-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.85fr);
+        gap: 16px;
+        align-items: start;
+    }
+
+    .upload-card,
+    .info-card,
+    .reference-card,
+    .result-preview-card,
+    .metrics-card,
+    .explanation-card {
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+    }
+
+    .upload-card {
+        padding: 25px;
+    }
+
+    .card-heading {
+        margin-bottom: 8px;
+    }
+
+    .card-heading h2 {
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 19px;
+        font-weight: 620;
+    }
+
+    .card-description {
+        margin: 0 0 21px;
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1.65;
+    }
+
+    .drop-zone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 205px;
+        box-sizing: border-box;
+        padding: 25px;
+        text-align: center;
+        background: #0d1522;
+        border: 1px dashed #3b4a60;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: border-color 0.15s ease,
+                    background-color 0.15s ease;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+        background: #101a2a;
+        border-color: #4f8edc;
+    }
+
+    .upload-icon {
+        width: 46px;
+        height: 46px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 13px;
+        color: #60a5fa;
+        background: #111c2c;
+        border: 1px solid #2d405b;
+        border-radius: 9px;
+    }
+
+    .drop-title {
+        color: #dbe4ef;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .drop-description {
+        margin-top: 5px;
+        color: #64748b;
+        font-size: 12px;
+    }
+
+    .file-types {
+        margin-top: 12px;
+        color: #475569;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+    }
+
+    .image-preview {
+        margin-top: 12px;
+        overflow: hidden;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 8px;
+    }
+
+    .preview-image-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 180px;
+        padding: 12px;
+        background: #080d16;
+    }
+
+    .preview-image-wrapper img {
+        display: block;
+        max-width: 100%;
+        max-height: 300px;
+        object-fit: contain;
+        border-radius: 5px;
+    }
+
+    .preview-details {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 12px;
+        border-top: 1px solid #273449;
+    }
+
+    .preview-details > div {
+        min-width: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .preview-details strong {
+        overflow: hidden;
+        color: #cbd5e1;
+        font-size: 12px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .preview-details span {
+        color: #64748b;
+        font-size: 10px;
+    }
+
+    .remove-file {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border: 0;
+        border-radius: 5px;
+        color: #94a3b8;
+        background: transparent;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .remove-file:hover {
+        color: #fca5a5;
+        background: rgba(239, 68, 68, 0.08);
+    }
+
+    .analysis-options {
+        margin-top: 23px;
+        padding-top: 21px;
+        border-top: 1px solid #1e293b;
+    }
+
+    .option-heading {
+        margin-bottom: 13px;
+    }
+
+    .option-heading h3 {
+        margin: 0 0 5px;
+        color: #cbd5e1;
+        font-size: 13px;
+        font-weight: 650;
+    }
+
+    .option-heading p {
+        margin: 0;
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+    }
+
+    .feature-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 12px;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 7px;
+        cursor: pointer;
+    }
+
+    .feature-option:hover {
+        border-color: #3b4a60;
+    }
+
+    .feature-option input {
+        flex-shrink: 0;
+        width: 15px;
+        height: 15px;
+        margin: 2px 0 0;
+        accent-color: #4f8edc;
+    }
+
+    .feature-option span {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .feature-option strong {
+        color: #cbd5e1;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .feature-option small {
+        color: #64748b;
+        font-size: 9px;
+        line-height: 1.4;
+    }
+
+    .analysis-actions {
+        margin-top: 22px;
+    }
+
+    .info-column {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .info-card {
+        padding: 20px;
+    }
+
+    .info-card h2 {
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 17px;
+        font-weight: 620;
+    }
+
+    .requirements-list {
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+        margin: 18px 0 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .requirements-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        color: #94a3b8;
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .check {
+        color: #60a5fa;
+        font-weight: 700;
+    }
+
+    .pipeline {
+        margin-top: 18px;
+    }
+
+    .pipeline-step {
+        display: flex;
+        gap: 10px;
+    }
+
+    .pipeline-number {
+        flex-shrink: 0;
+        color: #60a5fa;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+    }
+
+    .pipeline-step strong {
+        display: block;
+        margin-bottom: 4px;
+        color: #cbd5e1;
+        font-size: 11px;
+        font-weight: 650;
+    }
+
+    .pipeline-step span:last-child {
+        display: block;
+        color: #64748b;
+        font-size: 10px;
+        line-height: 1.5;
+    }
+
+    .pipeline-line {
+        width: 1px;
+        height: 16px;
+        margin: 5px 0 5px 4px;
+        background: #273449;
+    }
+
+    .reference-card {
+        padding: 19px;
+    }
+
+    .reference-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .reference-label {
+        color: #64748b;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+    }
+
+    .reference-badge {
+        padding: 4px 7px;
+        color: #93c5fd;
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.18);
+        border-radius: 4px;
+        font-size: 9px;
+        font-weight: 700;
+    }
+
+    .reference-card h3 {
+        margin: 13px 0 6px;
+        color: #dbe4ef;
+        font-size: 16px;
+        font-weight: 650;
+    }
+
+    .reference-card p {
+        margin: 0;
+        color: #64748b;
+        font-size: 10px;
+        line-height: 1.6;
+    }
+
+    .results-section {
+        margin-top: 35px;
+    }
+
+    .results-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .results-header h2 {
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 19px;
+        font-weight: 620;
+    }
+
+    .result-status {
+        padding: 6px 9px;
+        color: #a7f3d0;
+        background: rgba(16, 185, 129, 0.07);
+        border: 1px solid rgba(52, 211, 153, 0.18);
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .results-layout {
+        display: grid;
+        grid-template-columns: minmax(300px, 1fr) minmax(0, 1.35fr);
+        gap: 14px;
+    }
+
+    .result-preview-card {
+        overflow: hidden;
+    }
+
+    .result-image-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 330px;
+        padding: 15px;
+        background: #080d16;
+    }
+
+    .result-image-wrapper img {
+        display: block;
+        max-width: 100%;
+        max-height: 420px;
+        object-fit: contain;
+        border-radius: 5px;
+    }
+
+    .result-file-details {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 13px 15px;
+        border-top: 1px solid #1e293b;
+    }
+
+    .result-file-details span {
+        color: #64748b;
+        font-size: 9px;
+    }
+
+    .result-file-details strong {
+        overflow: hidden;
+        color: #cbd5e1;
+        font-size: 11px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .metrics-card {
+        padding: 20px;
+    }
+
+    .metrics-card-header {
+        margin-bottom: 18px;
+    }
+
+    .metrics-card-header h3 {
+        margin: 0;
+        color: #dbe4ef;
+        font-size: 14px;
+        font-weight: 620;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .metric {
+        padding: 14px;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 7px;
+    }
+
+    .metric span {
+        display: block;
+        color: #64748b;
+        font-size: 10px;
+    }
+
+    .metric strong {
+        display: block;
+        margin-top: 8px;
+        color: #e2e8f0;
+        font-size: 19px;
+        font-weight: 650;
+    }
+
+    .explanation-card {
+        margin-top: 14px;
+        padding: 20px;
+    }
+
+    .explanation-card h3 {
+        margin: 0;
+        color: #dbe4ef;
+        font-size: 14px;
+        font-weight: 620;
+    }
+
+    .explanation-card p:last-child {
+        margin: 11px 0 0;
+        color: #94a3b8;
+        font-size: 11px;
+        line-height: 1.7;
+    }
+
+    @media (max-width: 950px) {
+        .analysis-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .results-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 650px) {
+        .images-page {
+            padding: 26px 16px 45px;
+        }
+
+        .page-header {
+            flex-direction: column;
+        }
+
+        .page-header h1 {
+            font-size: 26px;
+        }
+
+        .secondary-button {
+            width: 100%;
+        }
+
+        .upload-card {
+            padding: 19px;
+        }
+
+        .feature-grid,
+        .metrics-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .results-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const fileInput =
+            document.getElementById("imageFile");
+
+        const dropZone =
+            document.getElementById("dropZone");
+
+        const imagePreview =
+            document.getElementById("imagePreview");
+
+        const previewImage =
+            document.getElementById("previewImage");
+
+        const imageFileName =
+            document.getElementById("imageFileName");
+
+        const imageFileSize =
+            document.getElementById("imageFileSize");
+
+        const removeImage =
+            document.getElementById("removeImage");
+
+        const imageForm =
+            document.getElementById("imageForm");
+
+        const analyzeButton =
+            document.getElementById("analyzeButton");
+
+        const analyzeButtonText =
+            document.getElementById("analyzeButtonText");
+
+        const allowedExtensions = [
+            "png",
+            "jpg",
+            "jpeg",
+            "bmp",
+            "tif",
+            "tiff"
+        ];
+
+        const maxPreviewSize = 5 * 1024 * 1024;
+
+        function formatFileSize(bytes) {
+            if (!Number.isFinite(bytes) || bytes <= 0) {
+                return "0 KB";
+            }
+
+            const units = [
+                "Bytes",
+                "KB",
+                "MB",
+                "GB"
+            ];
+
+            let size = bytes;
+            let unitIndex = 0;
+
+            while (
+                size >= 1024 &&
+                unitIndex < units.length - 1
+            ) {
+                size /= 1024;
+                unitIndex++;
+            }
+
+            if (unitIndex === 0) {
+                return `${size} ${units[unitIndex]}`;
+            }
+
+            return `${size.toFixed(2)} ${units[unitIndex]}`;
+        }
+
+        function isAllowedFile(file) {
+            if (!file || !file.name) {
+                return false;
+            }
+
+            const parts =
+                file.name.toLowerCase().split(".");
+
+            if (parts.length < 2) {
+                return false;
+            }
+
+            const extension =
+                parts[parts.length - 1];
+
+            return allowedExtensions.includes(extension);
+        }
+
+        function displayFile(file) {
+            if (!file || !isAllowedFile(file)) {
+                alert(
+                    "Please select a PNG, JPG, JPEG, BMP, or TIFF image."
+                );
+
+                clearFile();
+                return;
+            }
+
+            if (imageFileName) {
+                imageFileName.textContent =
+                    file.name;
+            }
+
+            if (imageFileSize) {
+                imageFileSize.textContent =
+                    formatFileSize(file.size);
+            }
+
+            if (imagePreview) {
+                imagePreview.hidden = false;
+            }
+
+            if (
+                previewImage &&
+                file.size <= maxPreviewSize
+            ) {
+                const reader =
+                    new FileReader();
+
+                reader.onload = function (event) {
+                    previewImage.src =
+                        event.target.result;
+                    previewImage.hidden = false;
+                };
+
+                reader.readAsDataURL(file);
+            } else if (previewImage) {
+                previewImage.removeAttribute("src");
+                previewImage.hidden = true;
+            }
+
+            if (dropZone) {
+                dropZone.classList.add("has-file");
+            }
+        }
+
+        function clearFile() {
+            if (fileInput) {
+                fileInput.value = "";
+            }
+
+            if (imagePreview) {
+                imagePreview.hidden = true;
+            }
+
+            if (previewImage) {
+                previewImage.removeAttribute("src");
+                previewImage.hidden = true;
+            }
+
+            if (dropZone) {
+                dropZone.classList.remove("has-file");
+            }
+        }
+
+        if (fileInput) {
+            fileInput.addEventListener(
+                "change",
+                function () {
+                    const file =
+                        fileInput.files[0];
+
+                    if (file) {
+                        displayFile(file);
+                    }
+                }
+            );
+        }
+
+        if (removeImage) {
+            removeImage.addEventListener(
+                "click",
+                function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    clearFile();
+                }
+            );
+        }
+
+        if (dropZone) {
+            [
+                "dragenter",
+                "dragover"
+            ].forEach(function (eventName) {
+                dropZone.addEventListener(
+                    eventName,
+                    function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        dropZone.classList.add(
+                            "dragover"
+                        );
+                    }
+                );
+            });
+
+            [
+                "dragleave",
+                "drop"
+            ].forEach(function (eventName) {
+                dropZone.addEventListener(
+                    eventName,
+                    function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        dropZone.classList.remove(
+                            "dragover"
+                        );
+                    }
+                );
+            });
+
+            dropZone.addEventListener(
+                "drop",
+                function (event) {
+                    const files =
+                        event.dataTransfer.files;
+
+                    if (!files || !files.length) {
+                        return;
+                    }
+
+                    const file = files[0];
+
+                    if (!isAllowedFile(file)) {
+                        alert(
+                            "Unsupported image type. Please select a PNG, JPG, JPEG, BMP, or TIFF file."
+                        );
+
+                        return;
+                    }
+
+                    try {
+                        const dataTransfer =
+                            new DataTransfer();
+
+                        dataTransfer.items.add(file);
+
+                        fileInput.files =
+                            dataTransfer.files;
+
+                        displayFile(file);
+                    } catch (error) {
+                        displayFile(file);
+                    }
+                }
+            );
+        }
+
+        if (imageForm) {
+            imageForm.addEventListener(
+                "submit",
+                function (event) {
+                    if (
+                        !fileInput ||
+                        !fileInput.files ||
+                        !fileInput.files.length
+                    ) {
+                        event.preventDefault();
+
+                        alert(
+                            "Please select an image before starting the analysis."
+                        );
+
+                        return;
+                    }
+
+                    const file =
+                        fileInput.files[0];
+
+                    if (!isAllowedFile(file)) {
+                        event.preventDefault();
+
+                        alert(
+                            "Unsupported image type. Please select a supported image file."
+                        );
+
+                        return;
+                    }
+
+                    const selectedFeatures =
+                        imageForm.querySelectorAll(
+                            'input[name="features"]:checked'
+                        );
+
+                    if (!selectedFeatures.length) {
+                        event.preventDefault();
+
+                        alert(
+                            "Please select at least one analysis feature."
+                        );
+
+                        return;
+                    }
+
+                    if (analyzeButton) {
+                        analyzeButton.disabled = true;
+                    }
+
+                    if (analyzeButtonText) {
+                        analyzeButtonText.textContent =
+                            "Analyzing image...";
+                    }
+                }
+            );
+        }
+    });
+</script>
+{% endblock %}

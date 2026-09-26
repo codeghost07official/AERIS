@@ -1,0 +1,1361 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="telemetry-page">
+
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">AERIS / TELEMETRY</p>
+            <h1>Telemetry Analysis</h1>
+            <p class="page-description">
+                Upload spacecraft telemetry data and identify unusual
+                observations using explainable machine-learning analysis.
+            </p>
+        </div>
+
+        <a href="{{ url_for('history.history') }}" class="secondary-button">
+            View history
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="analysis-layout">
+
+        <section class="upload-card">
+
+            <div class="card-heading">
+                <div>
+                    <p class="eyebrow">DATA INPUT</p>
+                    <h2>Upload telemetry</h2>
+                </div>
+            </div>
+
+            <p class="card-description">
+                Select a CSV or Excel file containing numerical spacecraft
+                telemetry measurements. AERIS will validate the file before
+                running anomaly detection.
+            </p>
+
+            <form
+                method="POST"
+                action="{{ url_for('telemetry.analyze') }}"
+                enctype="multipart/form-data"
+                id="telemetryForm"
+            >
+
+                <label
+                    for="telemetryFile"
+                    class="drop-zone"
+                    id="dropZone"
+                >
+                    <input
+                        type="file"
+                        id="telemetryFile"
+                        name="file"
+                        accept=".csv,.xlsx,.xls"
+                        hidden
+                        required
+                    >
+
+                    <div class="upload-icon">
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="25"
+                            height="25"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M12 16V4"/>
+                            <path d="M7 9l5-5 5 5"/>
+                            <path d="M5 20h14"/>
+                        </svg>
+                    </div>
+
+                    <div class="drop-title">
+                        Drop telemetry file here
+                    </div>
+
+                    <div class="drop-description">
+                        or click to browse from your device
+                    </div>
+
+                    <div class="file-types">
+                        CSV · XLSX · XLS
+                    </div>
+                </label>
+
+                <div
+                    class="selected-file"
+                    id="selectedFile"
+                    hidden
+                >
+                    <div class="selected-file-icon">
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="18"
+                            height="18"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <path d="M14 2v6h6"/>
+                            <path d="M8 13h8"/>
+                            <path d="M8 17h6"/>
+                        </svg>
+                    </div>
+
+                    <div class="selected-file-details">
+                        <strong id="fileName">filename.csv</strong>
+                        <span id="fileSize">0 KB</span>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="remove-file"
+                        id="removeFile"
+                        aria-label="Remove selected file"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <div class="model-options">
+
+                    <div class="option-heading">
+                        <div>
+                            <h3>Detection method</h3>
+                            <p>
+                                Choose the model used to identify
+                                unusual telemetry observations.
+                            </p>
+                        </div>
+                    </div>
+
+                    <label class="model-option">
+                        <input
+                            type="radio"
+                            name="method"
+                            value="isolation_forest"
+                            checked
+                        >
+
+                        <span class="radio-content">
+                            <strong>Isolation Forest</strong>
+                            <span>
+                                Tree-based unsupervised anomaly detection
+                                suitable for multivariate telemetry data.
+                            </span>
+                        </span>
+                    </label>
+
+                    <label class="model-option">
+                        <input
+                            type="radio"
+                            name="method"
+                            value="pca"
+                        >
+
+                        <span class="radio-content">
+                            <strong>PCA reconstruction</strong>
+                            <span>
+                                Detects observations with unusually high
+                                reconstruction error after dimensionality
+                                reduction.
+                            </span>
+                        </span>
+                    </label>
+
+                </div>
+
+                <div class="analysis-actions">
+                    <button
+                        type="submit"
+                        class="primary-button"
+                        id="analyzeButton"
+                    >
+                        <span id="analyzeButtonText">
+                            Analyze telemetry
+                        </span>
+                    </button>
+                </div>
+
+            </form>
+
+        </section>
+
+        <aside class="info-column">
+
+            <div class="info-card">
+                <p class="eyebrow">SUPPORTED DATA</p>
+                <h2>Telemetry requirements</h2>
+
+                <ul class="requirements-list">
+                    <li>
+                        <span class="check">✓</span>
+                        <span>CSV, XLSX, or XLS format</span>
+                    </li>
+
+                    <li>
+                        <span class="check">✓</span>
+                        <span>At least one numerical feature</span>
+                    </li>
+
+                    <li>
+                        <span class="check">✓</span>
+                        <span>Rows representing telemetry observations</span>
+                    </li>
+
+                    <li>
+                        <span class="check">✓</span>
+                        <span>Reasonable amount of valid data</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="info-card">
+                <p class="eyebrow">HOW IT WORKS</p>
+                <h2>Analysis pipeline</h2>
+
+                <div class="pipeline">
+
+                    <div class="pipeline-step">
+                        <span class="pipeline-number">01</span>
+                        <div>
+                            <strong>Validate</strong>
+                            <span>
+                                Check file type, structure, and
+                                usable numerical columns.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-line"></div>
+
+                    <div class="pipeline-step">
+                        <span class="pipeline-number">02</span>
+                        <div>
+                            <strong>Prepare</strong>
+                            <span>
+                                Handle missing numerical values and
+                                prepare features for modeling.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-line"></div>
+
+                    <div class="pipeline-step">
+                        <span class="pipeline-number">03</span>
+                        <div>
+                            <strong>Detect</strong>
+                            <span>
+                                Calculate anomaly indications using
+                                the selected unsupervised method.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-line"></div>
+
+                    <div class="pipeline-step">
+                        <span class="pipeline-number">04</span>
+                        <div>
+                            <strong>Explain</strong>
+                            <span>
+                                Present observations, scores, and
+                                relevant telemetry features.
+                            </span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="reference-card">
+                <div class="reference-header">
+                    <span class="reference-label">REFERENCE DATASET</span>
+                    <span class="reference-badge">NASA</span>
+                </div>
+
+                <h3>SMAP / MSL</h3>
+
+                <p>
+                    AERIS supports analysis workflows based on the
+                    expert-labeled NASA SMAP and MSL anomaly-detection
+                    datasets.
+                </p>
+            </div>
+
+        </aside>
+
+    </div>
+
+    <section
+        class="results-section"
+        id="resultsSection"
+        {% if not results %}hidden{% endif %}
+    >
+
+        <div class="results-header">
+            <div>
+                <p class="eyebrow">ANALYSIS RESULTS</p>
+                <h2>Telemetry findings</h2>
+            </div>
+
+            {% if results %}
+                <div class="result-status">
+                    Analysis complete
+                </div>
+            {% endif %}
+        </div>
+
+        {% if results %}
+
+            <div class="result-metrics">
+
+                <div class="result-metric">
+                    <span>Total observations</span>
+                    <strong>
+                        {{ results.total_observations|default(0) }}
+                    </strong>
+                </div>
+
+                <div class="result-metric">
+                    <span>Anomalies detected</span>
+                    <strong>
+                        {{ results.anomalies_detected|default(0) }}
+                    </strong>
+                </div>
+
+                <div class="result-metric">
+                    <span>Anomaly rate</span>
+                    <strong>
+                        {{ results.anomaly_rate|default(0) }}%
+                    </strong>
+                </div>
+
+                <div class="result-metric">
+                    <span>Features analyzed</span>
+                    <strong>
+                        {{ results.features_used|default(0) }}
+                    </strong>
+                </div>
+
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <p class="eyebrow">VISUALIZATION</p>
+                        <h3>Anomaly distribution</h3>
+                    </div>
+                </div>
+
+                <div
+                    id="telemetryChart"
+                    class="telemetry-chart"
+                    data-chart='{{ results.chart_data|default("{}")|tojson }}'
+                ></div>
+            </div>
+
+            {% if results.anomaly_rows %}
+                <div class="table-card">
+
+                    <div class="table-header">
+                        <div>
+                            <p class="eyebrow">FLAGGED OBSERVATIONS</p>
+                            <h3>Detected anomalies</h3>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    {% for column in results.anomaly_columns %}
+                                        <th>{{ column }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for row in results.anomaly_rows %}
+                                    <tr>
+                                        {% for column in results.anomaly_columns %}
+                                            <td>
+                                                {{ row[column] }}
+                                            </td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            {% endif %}
+
+        {% endif %}
+
+    </section>
+
+</div>
+
+<style>
+    .telemetry-page {
+        width: 100%;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 34px 24px 60px;
+        box-sizing: border-box;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 30px;
+    }
+
+    .eyebrow {
+        margin: 0 0 8px;
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        color: #f1f5f9;
+        font-size: 30px;
+        line-height: 1.2;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+    }
+
+    .page-description {
+        max-width: 700px;
+        margin: 10px 0 0;
+        color: #94a3b8;
+        font-size: 14px;
+        line-height: 1.65;
+    }
+
+    .secondary-button,
+    .primary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        box-sizing: border-box;
+        padding: 10px 15px;
+        border-radius: 7px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .secondary-button {
+        flex-shrink: 0;
+        color: #cbd5e1;
+        background: #111827;
+        border: 1px solid #334155;
+    }
+
+    .secondary-button:hover {
+        background: #151e2c;
+        border-color: #475569;
+    }
+
+    .primary-button {
+        width: 100%;
+        color: #ffffff;
+        background: #2563eb;
+        border: 1px solid #3b82f6;
+    }
+
+    .primary-button:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+
+    .primary-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .secondary-button:focus-visible,
+    .primary-button:focus-visible {
+        outline: 2px solid #60a5fa;
+        outline-offset: 2px;
+    }
+
+    .flash-messages {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 22px;
+    }
+
+    .alert {
+        padding: 11px 13px;
+        border: 1px solid #334155;
+        border-radius: 7px;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .alert-success {
+        color: #bbf7d0;
+        background: rgba(22, 101, 52, 0.16);
+        border-color: rgba(34, 197, 94, 0.28);
+    }
+
+    .alert-danger,
+    .alert-error {
+        color: #fecaca;
+        background: rgba(127, 29, 29, 0.16);
+        border-color: rgba(239, 68, 68, 0.28);
+    }
+
+    .alert-warning {
+        color: #fde68a;
+        background: rgba(120, 53, 15, 0.16);
+        border-color: rgba(245, 158, 11, 0.28);
+    }
+
+    .alert-info {
+        color: #bfdbfe;
+        background: rgba(30, 64, 175, 0.16);
+        border-color: rgba(59, 130, 246, 0.28);
+    }
+
+    .analysis-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.85fr);
+        gap: 16px;
+        align-items: start;
+    }
+
+    .upload-card,
+    .info-card,
+    .reference-card,
+    .chart-card,
+    .table-card {
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+    }
+
+    .upload-card {
+        padding: 25px;
+    }
+
+    .card-heading {
+        margin-bottom: 8px;
+    }
+
+    .card-heading h2 {
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 19px;
+        font-weight: 620;
+    }
+
+    .card-description {
+        margin: 0 0 21px;
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1.65;
+    }
+
+    .drop-zone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 205px;
+        box-sizing: border-box;
+        padding: 25px;
+        text-align: center;
+        background: #0d1522;
+        border: 1px dashed #3b4a60;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: border-color 0.15s ease,
+                    background-color 0.15s ease;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+        background: #101a2a;
+        border-color: #4f8edc;
+    }
+
+    .upload-icon {
+        width: 46px;
+        height: 46px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 13px;
+        color: #60a5fa;
+        background: #111c2c;
+        border: 1px solid #2d405b;
+        border-radius: 9px;
+    }
+
+    .drop-title {
+        color: #dbe4ef;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .drop-description {
+        margin-top: 5px;
+        color: #64748b;
+        font-size: 12px;
+    }
+
+    .file-types {
+        margin-top: 12px;
+        color: #475569;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+    }
+
+    .selected-file {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        margin-top: 12px;
+        padding: 11px 12px;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 7px;
+    }
+
+    .selected-file-icon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #60a5fa;
+        background: #111c2c;
+        border-radius: 6px;
+    }
+
+    .selected-file-details {
+        min-width: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .selected-file-details strong {
+        overflow: hidden;
+        color: #cbd5e1;
+        font-size: 12px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .selected-file-details span {
+        color: #64748b;
+        font-size: 10px;
+    }
+
+    .remove-file {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border: 0;
+        border-radius: 5px;
+        color: #94a3b8;
+        background: transparent;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .remove-file:hover {
+        color: #fca5a5;
+        background: rgba(239, 68, 68, 0.08);
+    }
+
+    .model-options {
+        margin-top: 23px;
+        padding-top: 21px;
+        border-top: 1px solid #1e293b;
+    }
+
+    .option-heading {
+        margin-bottom: 13px;
+    }
+
+    .option-heading h3 {
+        margin: 0 0 5px;
+        color: #cbd5e1;
+        font-size: 13px;
+        font-weight: 650;
+    }
+
+    .option-heading p {
+        margin: 0;
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    .model-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 11px;
+        margin-top: 9px;
+        padding: 12px;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 7px;
+        cursor: pointer;
+    }
+
+    .model-option:hover {
+        border-color: #3b4a60;
+    }
+
+    .model-option input {
+        flex-shrink: 0;
+        width: 15px;
+        height: 15px;
+        margin: 2px 0 0;
+        accent-color: #4f8edc;
+    }
+
+    .radio-content {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .radio-content strong {
+        color: #cbd5e1;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .radio-content span {
+        color: #64748b;
+        font-size: 10px;
+        line-height: 1.55;
+    }
+
+    .analysis-actions {
+        margin-top: 22px;
+    }
+
+    .info-column {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .info-card {
+        padding: 20px;
+    }
+
+    .info-card h2 {
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 17px;
+        font-weight: 620;
+    }
+
+    .requirements-list {
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+        margin: 18px 0 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .requirements-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        color: #94a3b8;
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .check {
+        color: #60a5fa;
+        font-weight: 700;
+    }
+
+    .pipeline {
+        margin-top: 18px;
+    }
+
+    .pipeline-step {
+        display: flex;
+        gap: 10px;
+    }
+
+    .pipeline-number {
+        flex-shrink: 0;
+        color: #60a5fa;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+    }
+
+    .pipeline-step strong {
+        display: block;
+        margin-bottom: 4px;
+        color: #cbd5e1;
+        font-size: 11px;
+        font-weight: 650;
+    }
+
+    .pipeline-step span:last-child {
+        display: block;
+        color: #64748b;
+        font-size: 10px;
+        line-height: 1.5;
+    }
+
+    .pipeline-line {
+        width: 1px;
+        height: 16px;
+        margin: 5px 0 5px 4px;
+        background: #273449;
+    }
+
+    .reference-card {
+        padding: 19px;
+    }
+
+    .reference-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .reference-label {
+        color: #64748b;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+    }
+
+    .reference-badge {
+        padding: 4px 7px;
+        color: #93c5fd;
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.18);
+        border-radius: 4px;
+        font-size: 9px;
+        font-weight: 700;
+    }
+
+    .reference-card h3 {
+        margin: 13px 0 6px;
+        color: #dbe4ef;
+        font-size: 16px;
+        font-weight: 650;
+    }
+
+    .reference-card p {
+        margin: 0;
+        color: #64748b;
+        font-size: 10px;
+        line-height: 1.6;
+    }
+
+    .results-section {
+        margin-top: 35px;
+    }
+
+    .results-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .results-header h2 {
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 19px;
+        font-weight: 620;
+    }
+
+    .result-status {
+        padding: 6px 9px;
+        color: #a7f3d0;
+        background: rgba(16, 185, 129, 0.07);
+        border: 1px solid rgba(52, 211, 153, 0.18);
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .result-metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .result-metric {
+        padding: 15px;
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+    }
+
+    .result-metric span {
+        display: block;
+        color: #64748b;
+        font-size: 10px;
+    }
+
+    .result-metric strong {
+        display: block;
+        margin-top: 8px;
+        color: #e2e8f0;
+        font-size: 21px;
+        font-weight: 650;
+    }
+
+    .chart-card,
+    .table-card {
+        padding: 20px;
+        margin-bottom: 14px;
+    }
+
+    .chart-header,
+    .table-header {
+        margin-bottom: 15px;
+    }
+
+    .chart-header h3,
+    .table-header h3 {
+        margin: 0;
+        color: #dbe4ef;
+        font-size: 14px;
+        font-weight: 620;
+    }
+
+    .telemetry-chart {
+        width: 100%;
+        min-height: 330px;
+    }
+
+    .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        color: #94a3b8;
+        font-size: 11px;
+    }
+
+    th {
+        padding: 10px 12px;
+        color: #64748b;
+        background: #0d1522;
+        border-bottom: 1px solid #273449;
+        font-size: 10px;
+        font-weight: 650;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #1e293b;
+        white-space: nowrap;
+    }
+
+    tbody tr:hover {
+        background: #131c2b;
+    }
+
+    @media (max-width: 950px) {
+        .analysis-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .result-metrics {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 650px) {
+        .telemetry-page {
+            padding: 26px 16px 45px;
+        }
+
+        .page-header {
+            flex-direction: column;
+        }
+
+        .page-header h1 {
+            font-size: 26px;
+        }
+
+        .secondary-button {
+            width: 100%;
+        }
+
+        .upload-card {
+            padding: 19px;
+        }
+
+        .result-metrics {
+            grid-template-columns: 1fr;
+        }
+
+        .results-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const fileInput =
+            document.getElementById("telemetryFile");
+
+        const dropZone =
+            document.getElementById("dropZone");
+
+        const selectedFile =
+            document.getElementById("selectedFile");
+
+        const fileName =
+            document.getElementById("fileName");
+
+        const fileSize =
+            document.getElementById("fileSize");
+
+        const removeFile =
+            document.getElementById("removeFile");
+
+        const telemetryForm =
+            document.getElementById("telemetryForm");
+
+        const analyzeButton =
+            document.getElementById("analyzeButton");
+
+        const analyzeButtonText =
+            document.getElementById("analyzeButtonText");
+
+        const allowedExtensions = [
+            "csv",
+            "xlsx",
+            "xls"
+        ];
+
+        function formatFileSize(bytes) {
+            if (!Number.isFinite(bytes) || bytes <= 0) {
+                return "0 KB";
+            }
+
+            const units = [
+                "Bytes",
+                "KB",
+                "MB",
+                "GB"
+            ];
+
+            let size = bytes;
+            let unitIndex = 0;
+
+            while (size >= 1024 &&
+                   unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+
+            if (unitIndex === 0) {
+                return `${size} ${units[unitIndex]}`;
+            }
+
+            return `${size.toFixed(2)} ${units[unitIndex]}`;
+        }
+
+        function isAllowedFile(file) {
+            if (!file || !file.name) {
+                return false;
+            }
+
+            const parts = file.name.toLowerCase().split(".");
+
+            if (parts.length < 2) {
+                return false;
+            }
+
+            const extension =
+                parts[parts.length - 1];
+
+            return allowedExtensions.includes(extension);
+        }
+
+        function displayFile(file) {
+            if (!fileInput || !selectedFile) {
+                return;
+            }
+
+            if (!isAllowedFile(file)) {
+                fileInput.value = "";
+
+                alert(
+                    "Please select a CSV, XLSX, or XLS telemetry file."
+                );
+
+                return;
+            }
+
+            if (fileName) {
+                fileName.textContent = file.name;
+            }
+
+            if (fileSize) {
+                fileSize.textContent =
+                    formatFileSize(file.size);
+            }
+
+            selectedFile.hidden = false;
+
+            if (dropZone) {
+                dropZone.classList.add("has-file");
+            }
+        }
+
+        function clearFile() {
+            if (fileInput) {
+                fileInput.value = "";
+            }
+
+            if (selectedFile) {
+                selectedFile.hidden = true;
+            }
+
+            if (dropZone) {
+                dropZone.classList.remove("has-file");
+            }
+        }
+
+        if (fileInput) {
+            fileInput.addEventListener(
+                "change",
+                function () {
+                    const file = fileInput.files[0];
+
+                    if (file) {
+                        displayFile(file);
+                    }
+                }
+            );
+        }
+
+        if (removeFile) {
+            removeFile.addEventListener(
+                "click",
+                function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    clearFile();
+                }
+            );
+        }
+
+        if (dropZone) {
+            [
+                "dragenter",
+                "dragover"
+            ].forEach(function (eventName) {
+                dropZone.addEventListener(
+                    eventName,
+                    function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        dropZone.classList.add("dragover");
+                    }
+                );
+            });
+
+            [
+                "dragleave",
+                "drop"
+            ].forEach(function (eventName) {
+                dropZone.addEventListener(
+                    eventName,
+                    function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        dropZone.classList.remove("dragover");
+                    }
+                );
+            });
+
+            dropZone.addEventListener(
+                "drop",
+                function (event) {
+                    const files = event.dataTransfer.files;
+
+                    if (!files || !files.length) {
+                        return;
+                    }
+
+                    const file = files[0];
+
+                    if (!isAllowedFile(file)) {
+                        alert(
+                            "Please upload a CSV, XLSX, or XLS file."
+                        );
+                        return;
+                    }
+
+                    try {
+                        const dataTransfer =
+                            new DataTransfer();
+
+                        dataTransfer.items.add(file);
+                        fileInput.files =
+                            dataTransfer.files;
+
+                        displayFile(file);
+                    } catch (error) {
+                        displayFile(file);
+                    }
+                }
+            );
+        }
+
+        if (telemetryForm) {
+            telemetryForm.addEventListener(
+                "submit",
+                function (event) {
+                    if (!fileInput ||
+                        !fileInput.files ||
+                        !fileInput.files.length) {
+
+                        event.preventDefault();
+
+                        alert(
+                            "Please select a telemetry file before starting the analysis."
+                        );
+
+                        return;
+                    }
+
+                    const file =
+                        fileInput.files[0];
+
+                    if (!isAllowedFile(file)) {
+                        event.preventDefault();
+
+                        alert(
+                            "Unsupported file type. Please select a CSV, XLSX, or XLS file."
+                        );
+
+                        return;
+                    }
+
+                    if (analyzeButton) {
+                        analyzeButton.disabled = true;
+                    }
+
+                    if (analyzeButtonText) {
+                        analyzeButtonText.textContent =
+                            "Analyzing telemetry...";
+                    }
+                }
+            );
+        }
+
+        const chartElement =
+            document.getElementById("telemetryChart");
+
+        if (chartElement &&
+            typeof Plotly !== "undefined") {
+
+            const chartData =
+                chartElement.dataset.chart;
+
+            if (chartData) {
+                try {
+                    const parsedChart =
+                        JSON.parse(chartData);
+
+                    if (parsedChart &&
+                        Array.isArray(parsedChart.data)) {
+
+                        Plotly.newPlot(
+                            chartElement,
+                            parsedChart.data,
+                            parsedChart.layout || {},
+                            {
+                                responsive: true,
+                                displaylogo: false,
+                                modeBarButtonsToRemove: [
+                                    "lasso2d",
+                                    "select2d"
+                                ]
+                            }
+                        );
+                    }
+                } catch (error) {
+                    console.error(
+                        "Unable to render telemetry chart:",
+                        error
+                    );
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

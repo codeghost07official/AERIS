@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Welcome back</h1>
+            <p>Sign in to continue to AERIS.</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.login') }}" class="auth-form">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    autocomplete="email"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <div class="password-label">
+                    <label for="password">Password</label>
+                </div>
+
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="primary-button">
+                Sign in
+            </button>
+        </form>
+
+        <div class="divider">
+            <span>or</span>
+        </div>
+
+        <a href="{{ url_for('auth.google_login') }}" class="google-button">
+            <span class="google-icon">G</span>
+            Continue with Google
+        </a>
+
+        <div class="auth-footer">
+            <p>
+                Don't have an account?
+                <a href="{{ url_for('auth.register') }}">Create one</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-page {
+        min-height: calc(100vh - 80px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 20px;
+        background: #0B0F19;
+    }
+
+    .auth-card {
+        width: 100%;
+        max-width: 420px;
+        padding: 36px;
+        background: #111827;
+        border: 1px solid #263244;
+        border-radius: 14px;
+        box-sizing: border-box;
+    }
+
+    .auth-header {
+        margin-bottom: 28px;
+        text-align: center;
+    }
+
+    .auth-header h1 {
+        margin: 0 0 8px;
+        color: #F8FAFC;
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+
+    .auth-header p {
+        margin: 0;
+        color: #94A3B8;
+        font-size: 14px;
+    }
+
+    .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .form-group label {
+        color: #CBD5E1;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .password-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 12px 14px;
+        box-sizing: border-box;
+        color: #F8FAFC;
+        background: #0B0F19;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        outline: none;
+        font-size: 14px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .form-group input::placeholder {
+        color: #64748B;
+    }
+
+    .form-group input:focus {
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    }
+
+    .primary-button,
+    .google-button {
+        width: 100%;
+        min-height: 44px;
+        box-sizing: border-box;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .primary-button {
+        margin-top: 4px;
+        color: #FFFFFF;
+        background: #2563EB;
+        border: 1px solid #2563EB;
+    }
+
+    .primary-button:hover {
+        background: #1D4ED8;
+        border-color: #1D4ED8;
+    }
+
+    .divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 24px 0;
+        color: #64748B;
+        font-size: 12px;
+    }
+
+    .divider::before,
+    .divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #263244;
+    }
+
+    .google-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: #E2E8F0;
+        background: #111827;
+        border: 1px solid #334155;
+    }
+
+    .google-button:hover {
+        background: #172033;
+        border-color: #475569;
+    }
+
+    .google-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        color: #FFFFFF;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .auth-footer {
+        margin-top: 24px;
+        text-align: center;
+    }
+
+    .auth-footer p {
+        margin: 0;
+        color: #94A3B8;
+        font-size: 13px;
+    }
+
+    .auth-footer a {
+        color: #60A5FA;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .auth-footer a:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 480px) {
+        .auth-page {
+            padding: 32px 16px;
+        }
+
+        .auth-card {
+            padding: 28px 22px;
+        }
+
+        .auth-header h1 {
+            font-size: 24px;
+        }
+    }
+</style>
+{% endblock %}

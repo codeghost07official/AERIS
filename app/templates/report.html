@@ -1,0 +1,1222 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="report-page">
+
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">AERIS / REPORT</p>
+            <h1>Analysis Report</h1>
+            <p class="page-description">
+                Review the measured results, anomaly findings, and
+                methodology associated with an AERIS analysis.
+            </p>
+        </div>
+
+        <div class="header-actions">
+            <button
+                type="button"
+                class="secondary-button"
+                id="printReport"
+            >
+                Print report
+            </button>
+
+            <a
+                href="{{ url_for('history.history') }}"
+                class="secondary-button"
+            >
+                Back to history
+            </a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% set report_type = report.type|default(
+        report.analysis_type|default('telemetry')
+    )|lower %}
+
+    {% set report_filename = report.filename|default(
+        report.file_name|default('Analysis')
+    ) %}
+
+    <section class="report-summary">
+
+        <div class="summary-main">
+
+            <div class="summary-icon
+                {% if report_type == 'image' %}
+                    image
+                {% else %}
+                    telemetry
+                {% endif %}
+            ">
+                {% if report_type == 'image' %}
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="24"
+                        height="24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <rect
+                            x="3"
+                            y="4"
+                            width="18"
+                            height="16"
+                            rx="2"
+                        />
+                        <circle cx="8.5" cy="9" r="1.5"/>
+                        <path d="M21 16l-5-5-7 7"/>
+                    </svg>
+                {% else %}
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="24"
+                        height="24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path d="M4 19V5"/>
+                        <path d="M4 19h16"/>
+                        <path d="M7 15l3-4 3 2 5-7"/>
+                    </svg>
+                {% endif %}
+            </div>
+
+            <div class="summary-details">
+                <span class="summary-type">
+                    {{ report_type|title }} analysis
+                </span>
+
+                <h2>{{ report_filename }}</h2>
+
+                {% if report.created_at is defined %}
+                    <span class="summary-date">
+                        Analyzed {{ report.created_at }}
+                    </span>
+                {% elif report.timestamp is defined %}
+                    <span class="summary-date">
+                        Analyzed {{ report.timestamp }}
+                    </span>
+                {% endif %}
+            </div>
+
+        </div>
+
+        <div class="summary-status">
+            <span class="status-dot"></span>
+            {{ report.status|default('Completed')|title }}
+        </div>
+
+    </section>
+
+    {% if report_type == 'telemetry' %}
+
+        <section class="metrics-grid">
+
+            <div class="metric-card">
+                <span>Total observations</span>
+                <strong>
+                    {{ report.total_observations|default(0) }}
+                </strong>
+            </div>
+
+            <div class="metric-card">
+                <span>Anomalies detected</span>
+                <strong>
+                    {{ report.anomalies_detected
+                       |default(report.anomaly_count|default(0)) }}
+                </strong>
+            </div>
+
+            <div class="metric-card">
+                <span>Anomaly rate</span>
+                <strong>
+                    {{ report.anomaly_rate|default(0) }}%
+                </strong>
+            </div>
+
+            <div class="metric-card">
+                <span>Features analyzed</span>
+                <strong>
+                    {{ report.features_used
+                       |default(report.feature_count|default(0)) }}
+                </strong>
+            </div>
+
+        </section>
+
+        <section class="report-grid">
+
+            <div class="report-card chart-card">
+
+                <div class="card-header">
+                    <div>
+                        <p class="eyebrow">TELEMETRY VISUALIZATION</p>
+                        <h2>Anomaly distribution</h2>
+                    </div>
+                </div>
+
+                <div
+                    id="reportChart"
+                    class="report-chart"
+                    data-chart='{{ report.chart_data|default("{}")|tojson }}'
+                ></div>
+
+                <div
+                    id="chartUnavailable"
+                    class="chart-unavailable"
+                    hidden
+                >
+                    <p>
+                        No chart data is available for this analysis.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="report-card methodology-card">
+
+                <div class="card-header">
+                    <div>
+                        <p class="eyebrow">METHODOLOGY</p>
+                        <h2>Detection method</h2>
+                    </div>
+                </div>
+
+                <div class="method-detail">
+                    <span>Model</span>
+
+                    <strong>
+                        {% if report.method == 'pca' %}
+                            PCA reconstruction
+                        {% elif report.method == 'isolation_forest' %}
+                            Isolation Forest
+                        {% else %}
+                            {{ report.method|default(
+                                'Anomaly detection'
+                            )|replace('_', ' ')|title }}
+                        {% endif %}
+                    </strong>
+                </div>
+
+                {% if report.method_description %}
+                    <p class="method-description">
+                        {{ report.method_description }}
+                    </p>
+                {% else %}
+                    <p class="method-description">
+                        The selected unsupervised method identifies
+                        observations that differ from patterns learned
+                        from the supplied telemetry data.
+                    </p>
+                {% endif %}
+
+                <div class="method-detail">
+                    <span>Features</span>
+
+                    <strong>
+                        {{ report.features_used
+                           |default(report.feature_count|default(0)) }}
+                        numerical feature{% if
+                            (report.features_used
+                            |default(report.feature_count|default(0)))
+                            != 1
+                        %}s{% endif %}
+                    </strong>
+                </div>
+
+                {% if report.feature_names %}
+                    <div class="feature-tags">
+                        {% for feature in report.feature_names %}
+                            <span>{{ feature }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+            </div>
+
+        </section>
+
+        {% if report.anomaly_rows %}
+
+            <section class="report-card anomaly-card">
+
+                <div class="card-header">
+                    <div>
+                        <p class="eyebrow">FLAGGED OBSERVATIONS</p>
+                        <h2>Detected anomalies</h2>
+                    </div>
+
+                    <span class="count-badge">
+                        {{ report.anomaly_rows|length }} shown
+                    </span>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                {% for column in report.anomaly_columns %}
+                                    <th>{{ column }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for row in report.anomaly_rows %}
+                                <tr>
+                                    {% for column in report.anomaly_columns %}
+                                        <td>
+                                            {{ row[column] }}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+        {% endif %}
+
+    {% elif report_type == 'image' %}
+
+        <section class="image-report-grid">
+
+            <div class="report-card image-result-card">
+
+                <div class="card-header">
+                    <div>
+                        <p class="eyebrow">ANALYZED IMAGE</p>
+                        <h2>Spacecraft imagery</h2>
+                    </div>
+                </div>
+
+                {% if report.image_url %}
+
+                    <div class="report-image-wrapper">
+                        <img
+                            src="{{ report.image_url }}"
+                            alt="Analyzed spacecraft image"
+                        >
+                    </div>
+
+                {% else %}
+
+                    <div class="image-unavailable">
+                        <div class="empty-icon">
+                            <svg
+                                viewBox="0 0 24 24"
+                                width="23"
+                                height="23"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="3"
+                                    y="4"
+                                    width="18"
+                                    height="16"
+                                    rx="2"
+                                />
+                                <circle
+                                    cx="8.5"
+                                    cy="9"
+                                    r="1.5"
+                                />
+                                <path d="M21 16l-5-5-7 7"/>
+                            </svg>
+                        </div>
+
+                        <p>
+                            Image preview is not available for this report.
+                        </p>
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+            <div class="report-card">
+
+                <div class="card-header">
+                    <div>
+                        <p class="eyebrow">MEASUREMENTS</p>
+                        <h2>Extracted features</h2>
+                    </div>
+                </div>
+
+                <div class="image-metrics">
+
+                    {% if report.brightness is defined %}
+                        <div class="image-metric">
+                            <span>Brightness</span>
+                            <strong>
+                                {{ "%.3f"|format(report.brightness) }}
+                            </strong>
+                            <small>
+                                Mean grayscale intensity
+                            </small>
+                        </div>
+                    {% endif %}
+
+                    {% if report.contrast is defined %}
+                        <div class="image-metric">
+                            <span>Contrast</span>
+                            <strong>
+                                {{ "%.3f"|format(report.contrast) }}
+                            </strong>
+                            <small>
+                                Pixel intensity variation
+                            </small>
+                        </div>
+                    {% endif %}
+
+                    {% if report.sharpness is defined %}
+                        <div class="image-metric">
+                            <span>Sharpness</span>
+                            <strong>
+                                {{ "%.3f"|format(report.sharpness) }}
+                            </strong>
+                            <small>
+                                Laplacian variance
+                            </small>
+                        </div>
+                    {% endif %}
+
+                    {% if report.edge_density is defined %}
+                        <div class="image-metric">
+                            <span>Edge density</span>
+                            <strong>
+                                {{ "%.3f"|format(report.edge_density) }}
+                            </strong>
+                            <small>
+                                Proportion of detected edges
+                            </small>
+                        </div>
+                    {% endif %}
+
+                    {% if report.width is defined %}
+                        <div class="image-metric">
+                            <span>Width</span>
+                            <strong>
+                                {{ report.width }} px
+                            </strong>
+                            <small>
+                                Image width
+                            </small>
+                        </div>
+                    {% endif %}
+
+                    {% if report.height is defined %}
+                        <div class="image-metric">
+                            <span>Height</span>
+                            <strong>
+                                {{ report.height }} px
+                            </strong>
+                            <small>
+                                Image height
+                            </small>
+                        </div>
+                    {% endif %}
+
+                    {% if report.channels is defined %}
+                        <div class="image-metric">
+                            <span>Channels</span>
+                            <strong>
+                                {{ report.channels }}
+                            </strong>
+                            <small>
+                                Image channels
+                            </small>
+                        </div>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </section>
+
+        {% if report.explanation %}
+
+            <section class="report-card interpretation-card">
+
+                <p class="eyebrow">INTERPRETATION</p>
+
+                <h2>Measured image characteristics</h2>
+
+                <p>
+                    {{ report.explanation }}
+                </p>
+
+            </section>
+
+        {% endif %}
+
+    {% endif %}
+
+    <section class="report-card notes-card">
+
+        <div class="card-header">
+            <div>
+                <p class="eyebrow">INTERPRETATION GUIDE</p>
+                <h2>Important context</h2>
+            </div>
+        </div>
+
+        {% if report_type == 'telemetry' %}
+
+            <p>
+                An anomaly indication means that an observation differs
+                from patterns identified by the selected model. It does
+                not, by itself, establish the physical cause of the
+                behavior or confirm a spacecraft fault.
+            </p>
+
+            <p>
+                Results should be reviewed alongside the original
+                telemetry, mission context, engineering limits, and
+                expert knowledge before drawing conclusions.
+            </p>
+
+        {% else %}
+
+            <p>
+                Image measurements are numerical characteristics
+                calculated from the uploaded pixels. A high or low value
+                does not automatically indicate equipment damage or a
+                spacecraft anomaly.
+            </p>
+
+            <p>
+                Image findings should be interpreted together with
+                mission context, image acquisition conditions, and
+                relevant engineering information.
+            </p>
+
+        {% endif %}
+
+    </section>
+
+</div>
+
+<style>
+    .report-page {
+        width: 100%;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 34px 24px 60px;
+        box-sizing: border-box;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 28px;
+    }
+
+    .eyebrow {
+        margin: 0 0 8px;
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        color: #f1f5f9;
+        font-size: 30px;
+        line-height: 1.2;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+    }
+
+    .page-description {
+        max-width: 700px;
+        margin: 10px 0 0;
+        color: #94a3b8;
+        font-size: 14px;
+        line-height: 1.65;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .secondary-button {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        padding: 9px 13px;
+        color: #cbd5e1;
+        background: #111827;
+        border: 1px solid #334155;
+        border-radius: 7px;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .secondary-button:hover {
+        background: #151e2c;
+        border-color: #475569;
+    }
+
+    .secondary-button:focus-visible {
+        outline: 2px solid #60a5fa;
+        outline-offset: 2px;
+    }
+
+    .flash-messages {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .alert {
+        padding: 11px 13px;
+        border: 1px solid #334155;
+        border-radius: 7px;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .alert-success {
+        color: #bbf7d0;
+        background: rgba(22, 101, 52, 0.16);
+        border-color: rgba(34, 197, 94, 0.28);
+    }
+
+    .alert-danger,
+    .alert-error {
+        color: #fecaca;
+        background: rgba(127, 29, 29, 0.16);
+        border-color: rgba(239, 68, 68, 0.28);
+    }
+
+    .alert-warning {
+        color: #fde68a;
+        background: rgba(120, 53, 15, 0.16);
+        border-color: rgba(245, 158, 11, 0.28);
+    }
+
+    .alert-info {
+        color: #bfdbfe;
+        background: rgba(30, 64, 175, 0.16);
+        border-color: rgba(59, 130, 246, 0.28);
+    }
+
+    .report-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 15px;
+        padding: 20px;
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+    }
+
+    .summary-main {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 0;
+    }
+
+    .summary-icon {
+        width: 45px;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border: 1px solid #2d405b;
+        border-radius: 8px;
+    }
+
+    .summary-icon.telemetry {
+        color: #60a5fa;
+        background: #0d1929;
+    }
+
+    .summary-icon.image {
+        color: #94a3b8;
+        background: #111923;
+    }
+
+    .summary-details {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .summary-type {
+        color: #64748b;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .summary-details h2 {
+        overflow: hidden;
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 17px;
+        font-weight: 620;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .summary-date {
+        color: #64748b;
+        font-size: 10px;
+    }
+
+    .summary-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        flex-shrink: 0;
+        padding: 7px 10px;
+        color: #86efac;
+        background: rgba(16, 185, 129, 0.07);
+        border: 1px solid rgba(52, 211, 153, 0.18);
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #4ade80;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .metric-card {
+        padding: 16px;
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+    }
+
+    .metric-card span {
+        display: block;
+        color: #64748b;
+        font-size: 10px;
+    }
+
+    .metric-card strong {
+        display: block;
+        margin-top: 8px;
+        color: #e2e8f0;
+        font-size: 22px;
+        font-weight: 650;
+    }
+
+    .report-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.6fr) minmax(290px, 0.8fr);
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+
+    .report-card {
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+    }
+
+    .chart-card,
+    .methodology-card,
+    .anomaly-card,
+    .notes-card,
+    .interpretation-card {
+        padding: 20px;
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .card-header h2 {
+        margin: 0;
+        color: #dbe4ef;
+        font-size: 15px;
+        font-weight: 620;
+    }
+
+    .report-chart {
+        width: 100%;
+        min-height: 330px;
+    }
+
+    .chart-unavailable {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 260px;
+        color: #64748b;
+        font-size: 11px;
+        text-align: center;
+    }
+
+    .chart-unavailable p {
+        margin: 0;
+    }
+
+    .method-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 12px;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 7px;
+    }
+
+    .method-detail + .method-detail {
+        margin-top: 9px;
+    }
+
+    .method-detail span {
+        color: #64748b;
+        font-size: 9px;
+    }
+
+    .method-detail strong {
+        color: #cbd5e1;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .method-description {
+        margin: 12px 0;
+        color: #64748b;
+        font-size: 10px;
+        line-height: 1.65;
+    }
+
+    .feature-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 9px;
+    }
+
+    .feature-tags span {
+        max-width: 100%;
+        overflow: hidden;
+        padding: 5px 7px;
+        color: #94a3b8;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 4px;
+        font-size: 9px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .anomaly-card {
+        margin-bottom: 14px;
+    }
+
+    .count-badge {
+        padding: 5px 8px;
+        color: #94a3b8;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 5px;
+        font-size: 9px;
+        font-weight: 600;
+    }
+
+    .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        color: #94a3b8;
+        font-size: 10px;
+    }
+
+    th {
+        padding: 10px;
+        color: #64748b;
+        background: #0d1522;
+        border-bottom: 1px solid #273449;
+        font-size: 9px;
+        font-weight: 650;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    td {
+        padding: 10px;
+        border-bottom: 1px solid #1e293b;
+        white-space: nowrap;
+    }
+
+    tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    tbody tr:hover {
+        background: #131c2b;
+    }
+
+    .image-report-grid {
+        display: grid;
+        grid-template-columns: minmax(300px, 1fr) minmax(0, 1fr);
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+
+    .image-result-card {
+        overflow: hidden;
+    }
+
+    .image-result-card .card-header {
+        padding: 20px 20px 0;
+    }
+
+    .report-image-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 360px;
+        margin-top: 18px;
+        padding: 15px;
+        background: #080d16;
+        border-top: 1px solid #1e293b;
+    }
+
+    .report-image-wrapper img {
+        display: block;
+        max-width: 100%;
+        max-height: 450px;
+        object-fit: contain;
+        border-radius: 5px;
+    }
+
+    .image-unavailable {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        min-height: 330px;
+        padding: 20px;
+        color: #64748b;
+        text-align: center;
+    }
+
+    .empty-icon {
+        width: 45px;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+        color: #60a5fa;
+        background: #0d1929;
+        border: 1px solid #2d405b;
+        border-radius: 8px;
+    }
+
+    .image-unavailable p {
+        margin: 0;
+        font-size: 10px;
+    }
+
+    .image-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+    }
+
+    .image-metric {
+        padding: 13px;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 7px;
+    }
+
+    .image-metric span {
+        display: block;
+        color: #64748b;
+        font-size: 9px;
+    }
+
+    .image-metric strong {
+        display: block;
+        margin-top: 7px;
+        color: #e2e8f0;
+        font-size: 18px;
+        font-weight: 650;
+    }
+
+    .image-metric small {
+        display: block;
+        margin-top: 5px;
+        color: #475569;
+        font-size: 8px;
+        line-height: 1.4;
+    }
+
+    .interpretation-card,
+    .notes-card {
+        margin-bottom: 14px;
+    }
+
+    .interpretation-card h2,
+    .notes-card h2 {
+        margin: 0;
+        color: #dbe4ef;
+        font-size: 15px;
+        font-weight: 620;
+    }
+
+    .interpretation-card > p:last-child,
+    .notes-card > p {
+        max-width: 900px;
+        margin: 11px 0 0;
+        color: #94a3b8;
+        font-size: 11px;
+        line-height: 1.7;
+    }
+
+    .notes-card > p + p {
+        margin-top: 9px;
+    }
+
+    @media (max-width: 950px) {
+        .metrics-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .report-grid,
+        .image-report-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 650px) {
+        .report-page {
+            padding: 26px 16px 45px;
+        }
+
+        .page-header {
+            flex-direction: column;
+        }
+
+        .page-header h1 {
+            font-size: 26px;
+        }
+
+        .header-actions {
+            width: 100%;
+        }
+
+        .header-actions .secondary-button {
+            flex: 1;
+        }
+
+        .report-summary {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .summary-status {
+            align-self: flex-start;
+        }
+
+        .metrics-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .image-metrics {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media print {
+        .page-header .header-actions,
+        .flash-messages {
+            display: none !important;
+        }
+
+        .report-page {
+            max-width: none;
+            padding: 0;
+        }
+
+        .report-card,
+        .report-summary,
+        .metric-card {
+            break-inside: avoid;
+            box-shadow: none;
+        }
+
+        body {
+            background: #ffffff !important;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const printButton =
+            document.getElementById("printReport");
+
+        if (printButton) {
+            printButton.addEventListener(
+                "click",
+                function () {
+                    window.print();
+                }
+            );
+        }
+
+        const chartElement =
+            document.getElementById("reportChart");
+
+        const unavailable =
+            document.getElementById("chartUnavailable");
+
+        if (!chartElement) {
+            return;
+        }
+
+        if (typeof Plotly === "undefined") {
+            chartElement.hidden = true;
+
+            if (unavailable) {
+                unavailable.hidden = false;
+            }
+
+            return;
+        }
+
+        const chartData =
+            chartElement.dataset.chart;
+
+        if (!chartData) {
+            chartElement.hidden = true;
+
+            if (unavailable) {
+                unavailable.hidden = false;
+            }
+
+            return;
+        }
+
+        try {
+            const parsedChart =
+                JSON.parse(chartData);
+
+            if (
+                !parsedChart ||
+                !Array.isArray(parsedChart.data) ||
+                !parsedChart.data.length
+            ) {
+                throw new Error(
+                    "Chart data is empty."
+                );
+            }
+
+            const layout =
+                parsedChart.layout || {};
+
+            layout.autosize = true;
+            layout.paper_bgcolor = "transparent";
+            layout.plot_bgcolor = "transparent";
+            layout.font = {
+                color: "#94a3b8",
+                family: "Inter, sans-serif"
+            };
+
+            Plotly.newPlot(
+                chartElement,
+                parsedChart.data,
+                layout,
+                {
+                    responsive: true,
+                    displaylogo: false,
+                    modeBarButtonsToRemove: [
+                        "lasso2d",
+                        "select2d"
+                    ]
+                }
+            );
+
+        } catch (error) {
+            console.error(
+                "Unable to render report chart:",
+                error
+            );
+
+            chartElement.hidden = true;
+
+            if (unavailable) {
+                unavailable.hidden = false;
+            }
+        }
+    });
+</script>
+{% endblock %}

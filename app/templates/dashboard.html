@@ -1,0 +1,667 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-page">
+
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">AERIS / OPERATIONS</p>
+            <h1>Mission Dashboard</h1>
+            <p class="page-description">
+                Monitor spacecraft telemetry, investigate anomalies,
+                and analyze spacecraft imagery from one workspace.
+            </p>
+        </div>
+
+        <div class="header-status">
+            <span class="status-dot"></span>
+            System Ready
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <section class="metrics-grid" aria-label="System overview">
+
+        <article class="metric-card">
+            <div class="metric-label">Telemetry Analyses</div>
+            <div class="metric-value">
+                {{ telemetry_count|default(0) }}
+            </div>
+            <div class="metric-description">
+                Files analyzed
+            </div>
+        </article>
+
+        <article class="metric-card">
+            <div class="metric-label">Anomalies Detected</div>
+            <div class="metric-value">
+                {{ anomaly_count|default(0) }}
+            </div>
+            <div class="metric-description">
+                Across analyzed telemetry
+            </div>
+        </article>
+
+        <article class="metric-card">
+            <div class="metric-label">Image Analyses</div>
+            <div class="metric-value">
+                {{ image_count|default(0) }}
+            </div>
+            <div class="metric-description">
+                Spacecraft images processed
+            </div>
+        </article>
+
+        <article class="metric-card">
+            <div class="metric-label">Analysis Status</div>
+            <div class="metric-status">
+                <span class="status-dot"></span>
+                Operational
+            </div>
+            <div class="metric-description">
+                AERIS analysis engine
+            </div>
+        </article>
+
+    </section>
+
+    <section class="workspace-section">
+
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">ANALYSIS WORKSPACE</p>
+                <h2>Start an analysis</h2>
+            </div>
+        </div>
+
+        <div class="workspace-grid">
+
+            <a href="{{ url_for('telemetry.telemetry') }}"
+               class="workspace-card">
+
+                <div class="workspace-icon telemetry-icon">
+                    <svg viewBox="0 0 24 24"
+                         width="22"
+                         height="22"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.7"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         aria-hidden="true">
+                        <path d="M4 19V5"/>
+                        <path d="M4 19h16"/>
+                        <path d="M7 15l3-4 3 2 5-7"/>
+                    </svg>
+                </div>
+
+                <div class="workspace-content">
+                    <h3>Telemetry Analysis</h3>
+                    <p>
+                        Upload CSV or Excel telemetry data and use
+                        machine learning to identify unusual behavior
+                        across spacecraft parameters.
+                    </p>
+
+                    <span class="workspace-link">
+                        Analyze telemetry
+                        <span aria-hidden="true">→</span>
+                    </span>
+                </div>
+            </a>
+
+            <a href="{{ url_for('images.images') }}"
+               class="workspace-card">
+
+                <div class="workspace-icon image-icon">
+                    <svg viewBox="0 0 24 24"
+                         width="22"
+                         height="22"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.7"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         aria-hidden="true">
+                        <rect x="3" y="4" width="18" height="16" rx="2"/>
+                        <circle cx="8.5" cy="9" r="1.5"/>
+                        <path d="M21 16l-5-5-7 7"/>
+                        <path d="M13 15l2-2 6 6"/>
+                    </svg>
+                </div>
+
+                <div class="workspace-content">
+                    <h3>Image Analysis</h3>
+                    <p>
+                        Upload spacecraft imagery and examine measurable
+                        visual features such as brightness, contrast,
+                        edges, and image quality indicators.
+                    </p>
+
+                    <span class="workspace-link">
+                        Analyze imagery
+                        <span aria-hidden="true">→</span>
+                    </span>
+                </div>
+            </a>
+
+            <a href="{{ url_for('history.history') }}"
+               class="workspace-card">
+
+                <div class="workspace-icon history-icon">
+                    <svg viewBox="0 0 24 24"
+                         width="22"
+                         height="22"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.7"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         aria-hidden="true">
+                        <path d="M3 12a9 9 0 1 0 3-6.7"/>
+                        <path d="M3 4v5h5"/>
+                        <path d="M12 7v5l3 2"/>
+                    </svg>
+                </div>
+
+                <div class="workspace-content">
+                    <h3>Analysis History</h3>
+                    <p>
+                        Review previous telemetry and image analyses,
+                        inspect results, and revisit saved findings.
+                    </p>
+
+                    <span class="workspace-link">
+                        View history
+                        <span aria-hidden="true">→</span>
+                    </span>
+                </div>
+            </a>
+
+        </div>
+
+    </section>
+
+    <section class="information-section">
+
+        <div class="info-card">
+            <div class="info-card-header">
+                <div>
+                    <p class="eyebrow">ABOUT THE MODEL</p>
+                    <h2>Explainable anomaly detection</h2>
+                </div>
+            </div>
+
+            <p>
+                AERIS uses statistical and machine-learning techniques
+                to identify telemetry observations that differ from
+                the learned behavior of the supplied dataset.
+            </p>
+
+            <div class="method-list">
+                <div class="method-item">
+                    <span class="method-number">01</span>
+                    <div>
+                        <strong>Data validation</strong>
+                        <span>
+                            Uploaded telemetry is checked for usable
+                            numerical features and missing values.
+                        </span>
+                    </div>
+                </div>
+
+                <div class="method-item">
+                    <span class="method-number">02</span>
+                    <div>
+                        <strong>Feature preparation</strong>
+                        <span>
+                            Relevant numerical measurements are prepared
+                            for statistical or ML analysis.
+                        </span>
+                    </div>
+                </div>
+
+                <div class="method-item">
+                    <span class="method-number">03</span>
+                    <div>
+                        <strong>Anomaly scoring</strong>
+                        <span>
+                            The selected model assigns observations
+                            an anomaly indication based on learned
+                            data patterns.
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-card dataset-card">
+            <p class="eyebrow">REFERENCE DATA</p>
+            <h2>NASA SMAP / MSL</h2>
+
+            <p>
+                AERIS is designed to work with expert-labeled NASA
+                spacecraft telemetry anomaly-detection datasets,
+                including the SMAP and MSL datasets.
+            </p>
+
+            <div class="dataset-tags">
+                <span>NASA</span>
+                <span>SMAP</span>
+                <span>MSL</span>
+                <span>Telemetry</span>
+            </div>
+        </div>
+
+    </section>
+
+</div>
+
+<style>
+    .dashboard-page {
+        width: 100%;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 34px 24px 60px;
+        box-sizing: border-box;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 30px;
+    }
+
+    .eyebrow {
+        margin: 0 0 8px;
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        color: #f1f5f9;
+        font-size: 30px;
+        line-height: 1.2;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+    }
+
+    .page-description {
+        max-width: 650px;
+        margin: 10px 0 0;
+        color: #94a3b8;
+        font-size: 14px;
+        line-height: 1.65;
+    }
+
+    .header-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        padding: 8px 11px;
+        color: #a7f3d0;
+        background: rgba(16, 185, 129, 0.07);
+        border: 1px solid rgba(52, 211, 153, 0.18);
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .status-dot {
+        width: 7px;
+        height: 7px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: #34d399;
+    }
+
+    .flash-messages {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 22px;
+    }
+
+    .alert {
+        padding: 11px 13px;
+        border: 1px solid #334155;
+        border-radius: 7px;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .alert-success {
+        color: #bbf7d0;
+        background: rgba(22, 101, 52, 0.16);
+        border-color: rgba(34, 197, 94, 0.28);
+    }
+
+    .alert-danger,
+    .alert-error {
+        color: #fecaca;
+        background: rgba(127, 29, 29, 0.16);
+        border-color: rgba(239, 68, 68, 0.28);
+    }
+
+    .alert-warning {
+        color: #fde68a;
+        background: rgba(120, 53, 15, 0.16);
+        border-color: rgba(245, 158, 11, 0.28);
+    }
+
+    .alert-info {
+        color: #bfdbfe;
+        background: rgba(30, 64, 175, 0.16);
+        border-color: rgba(59, 130, 246, 0.28);
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 42px;
+    }
+
+    .metric-card {
+        min-height: 125px;
+        padding: 19px;
+        box-sizing: border-box;
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+    }
+
+    .metric-label {
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .metric-value {
+        margin-top: 12px;
+        color: #f1f5f9;
+        font-size: 28px;
+        line-height: 1;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+    }
+
+    .metric-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 14px;
+        color: #a7f3d0;
+        font-size: 17px;
+        font-weight: 600;
+    }
+
+    .metric-description {
+        margin-top: 9px;
+        color: #64748b;
+        font-size: 11px;
+    }
+
+    .workspace-section {
+        margin-bottom: 42px;
+    }
+
+    .section-heading {
+        margin-bottom: 17px;
+    }
+
+    .section-heading h2,
+    .info-card h2 {
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 19px;
+        line-height: 1.3;
+        font-weight: 620;
+        letter-spacing: -0.015em;
+    }
+
+    .workspace-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .workspace-card {
+        display: flex;
+        flex-direction: column;
+        min-height: 245px;
+        padding: 21px;
+        box-sizing: border-box;
+        color: inherit;
+        text-decoration: none;
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+        transition: border-color 0.15s ease,
+                    background-color 0.15s ease;
+    }
+
+    .workspace-card:hover {
+        background: #131c2b;
+        border-color: #334155;
+    }
+
+    .workspace-card:focus-visible {
+        outline: 2px solid #60a5fa;
+        outline-offset: 2px;
+    }
+
+    .workspace-icon {
+        width: 40px;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 23px;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        color: #7db3ef;
+        background: #0d1522;
+    }
+
+    .workspace-content {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+    }
+
+    .workspace-content h3 {
+        margin: 0 0 8px;
+        color: #e2e8f0;
+        font-size: 16px;
+        font-weight: 620;
+    }
+
+    .workspace-content p {
+        margin: 0;
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1.65;
+    }
+
+    .workspace-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: auto;
+        padding-top: 22px;
+        color: #60a5fa;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .workspace-card:hover .workspace-link {
+        color: #93c5fd;
+    }
+
+    .information-section {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+        gap: 14px;
+    }
+
+    .info-card {
+        padding: 22px;
+        box-sizing: border-box;
+        background: #111827;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+    }
+
+    .info-card > p:not(.eyebrow) {
+        margin: 13px 0 0;
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1.7;
+    }
+
+    .method-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 23px;
+    }
+
+    .method-item {
+        display: flex;
+        gap: 10px;
+    }
+
+    .method-number {
+        color: #60a5fa;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+    }
+
+    .method-item strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #cbd5e1;
+        font-size: 11px;
+        font-weight: 650;
+    }
+
+    .method-item span:not(.method-number) {
+        display: block;
+        color: #64748b;
+        font-size: 10px;
+        line-height: 1.55;
+    }
+
+    .dataset-card {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .dataset-card h2 {
+        font-size: 20px;
+    }
+
+    .dataset-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: auto;
+        padding-top: 22px;
+    }
+
+    .dataset-tags span {
+        padding: 5px 8px;
+        color: #94a3b8;
+        background: #0d1522;
+        border: 1px solid #273449;
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    @media (max-width: 1000px) {
+        .metrics-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .workspace-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .workspace-card {
+            min-height: 205px;
+        }
+
+        .information-section {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .dashboard-page {
+            padding: 26px 16px 45px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            margin-bottom: 25px;
+        }
+
+        .page-header h1 {
+            font-size: 26px;
+        }
+
+        .header-status {
+            align-self: flex-start;
+        }
+
+        .metrics-grid {
+            gap: 10px;
+            margin-bottom: 34px;
+        }
+
+        .metric-card {
+            min-height: 112px;
+            padding: 15px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+        }
+
+        .metric-status {
+            font-size: 14px;
+        }
+
+        .method-list {
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+    }
+
+    @media (max-width: 460px) {
+        .metrics-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
