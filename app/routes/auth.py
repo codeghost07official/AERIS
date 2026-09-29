@@ -1,6 +1,6 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_user, logout_user
-
+from authlib.integrations.flask_client import OAuth
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.database import (
@@ -9,6 +9,8 @@ from app.database import (
     get_user_by_google_id,
 )
 
+
+oauth = OAuth()
 
 auth_bp = Blueprint(
     "auth",
@@ -20,9 +22,6 @@ auth_bp = Blueprint(
 class User:
     """
     Lightweight Flask-Login user object.
-
-    This object converts the database user dictionary into the
-    interface expected by Flask-Login.
     """
 
     def __init__(self, user_data):
@@ -181,29 +180,85 @@ def register():
 @auth_bp.route("/google")
 def google_login():
     """
-    Begin Google OAuth authentication.
-
-    The actual OAuth client is intentionally handled only when
-    Google credentials are configured.
+    Start Google OAuth authentication.
     """
-    from flask import current_app
+    google = oauth.create_client("google")
 
-    client_id = current_app.config.get("GOOGLE_CLIENT_ID")
-    client_secret = current_app.config.get("GOOGLE_CLIENT_SECRET")
-
-    if not client_id or not client_secret:
+    if google is None:
         flash(
-            "Google authentication is not configured yet.",
+            "Google authentication is not configured correctly.",
             "error",
         )
         return redirect(url_for("auth.login"))
 
-    flash(
-        "Google authentication will be enabled when OAuth is configured.",
-        "info",
+    redirect_uri = url_for(
+        "auth.google_callback",
+        _external=True,
     )
 
-    return redirect(url_for("auth.login"))
+    return google.authorize_redirect(redirect_uri)
+
+
+@auth_bp.route("/google/callback")
+def google_callback():
+    """
+    Handle the response from Google OAuth.
+    """
+    google = oauth.create_client("google")
+
+    if google is None:
+        flash(
+            "Google authentication is not configured correctly.",
+            "error",
+        )
+        return redirect(url_for("auth.login"))
+
+    try:
+        token = google.authorize_access_token()
+
+        user_info = token.get("userinfo")
+
+        if not user_info:
+            user_info = google.userinfo()
+
+        google_id = user_info.get("sub")
+        email = user_info.get("email", "").strip().lower()
+        name = user_info.get("name") or email.split("@")[0]
+
+        if not google_id or not email:
+            flash(
+                "Google did not provide the required account information.",
+                "error",
+            )
+            return redirect(url_for("auth.login"))
+
+        user_data = get_user_by_google_id(google_id)
+
+        if not user_data:
+            user_data = get_user_by_email(email)
+
+        if not user_data:
+            user_data = create_user(
+                email=email,
+                password_hash=None,
+                name=name,
+                google_id=google_id,
+            )
+
+        user = user_from_database(user_data)
+
+        login_user(user)
+
+        flash("Welcome to AERIS.", "success")
+
+        return redirect(url_for("main.dashboard"))
+
+    except Exception:
+        flash(
+            "Google sign-in could not be completed.",
+            "error",
+        )
+        return redirect(url_for("auth.login"))
 
 
 @auth_bp.route("/logout")

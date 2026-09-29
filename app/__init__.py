@@ -22,8 +22,14 @@ def create_app():
     app.config.from_object(Config)
 
     # Ensure upload directories exist.
-    os.makedirs(app.config["TELEMETRY_UPLOAD_FOLDER"], exist_ok=True)
-    os.makedirs(app.config["IMAGE_UPLOAD_FOLDER"], exist_ok=True)
+    os.makedirs(
+        app.config["TELEMETRY_UPLOAD_FOLDER"],
+        exist_ok=True,
+    )
+    os.makedirs(
+        app.config["IMAGE_UPLOAD_FOLDER"],
+        exist_ok=True,
+    )
 
     # Initialize Flask-Login.
     login_manager.init_app(app)
@@ -35,17 +41,40 @@ def create_app():
     def load_user(user_id):
         """
         Load an authenticated user from the database.
-
-        Flask-Login stores the user's ID in the session and calls
-        this function whenever the current user needs to be restored.
         """
         try:
-            return get_user_by_id(user_id)
+            user_data = get_user_by_id(user_id)
+
+            if not user_data:
+                return None
+
+            from app.routes.auth import user_from_database
+
+            return user_from_database(user_data)
+
         except Exception:
             return None
 
+    # Import the OAuth instance created in auth.py.
+    from app.routes.auth import auth_bp, oauth
+
+    # Initialize Google OAuth with this Flask application.
+    oauth.init_app(app)
+
+    oauth.register(
+        name="google",
+        client_id=app.config["GOOGLE_CLIENT_ID"],
+        client_secret=app.config["GOOGLE_CLIENT_SECRET"],
+        server_metadata_url=(
+            "https://accounts.google.com/"
+            ".well-known/openid-configuration"
+        ),
+        client_kwargs={
+            "scope": "openid email profile",
+        },
+    )
+
     # Register application blueprints.
-    from app.routes.auth import auth_bp
     from app.routes.main import main_bp
     from app.routes.telemetry import telemetry_bp
     from app.routes.images import images_bp
