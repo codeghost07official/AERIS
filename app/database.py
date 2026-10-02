@@ -1,434 +1,325 @@
+
+import os
 import uuid
-from contextlib import contextmanager
-from datetime import datetime, timezone
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
+from dotenv import load_dotenv
 
-from app.config import Config
+load_dotenv(".env")
 
 
-def get_connection():
-    """
-    Create and return a PostgreSQL database connection.
+def get_db_connection():
+    database_url = os.getenv("DATABASE_URL")
 
-    AERIS uses PostgreSQL (Neon) for persistent metadata such as
-    users and analysis history. Large telemetry datasets and image
-    files are stored on local disk rather than inside the database.
-    """
-    return psycopg2.connect(
-        Config.DATABASE_URL,
-        cursor_factory=RealDictCursor,
-        connect_timeout=10,
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is missing from .env")
+
+    return psycopg.connect(
+        database_url,
+        row_factory=dict_row,
     )
 
 
-@contextmanager
-def get_db():
-    """
-    Context manager for safe database operations.
+def get_user_id_type():
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                    AND table_name = 'users'
+                    AND column_name = 'id'
+            """)
+            result = cur.fetchone()
 
-    The transaction is committed when the operation succeeds and
-    rolled back automatically if an exception occurs.
-    """
-    connection = get_connection()
-
-    try:
-        yield connection
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
-    finally:
-        connection.close()
+    return result["data_type"] if result else None
 
 
-def execute_query(query, params=None, fetch=False, fetchone=False):
-    """
-    Execute a parameterized SQL query safely.
+def create_user(name, email, password_hash=None, google_id=None):
+    id_type = get_user_id_type()
 
-    Parameters:
-        query: SQL statement.
-        params: Values supplied to the SQL statement.
-        fetch: Return all resulting rows.
-        fetchone: Return only the first resulting row.
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            if id_type == "uuid":
+                user_id = uuid.uuid4()
+                cur.execute("""
+                    INSERT INTO public.users
+                        (id, name, email, password_hash, google_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (user_id, name, email, password_hash, google_id))
+            else:
+                cur.execute("""
+                    INSERT INTO public.users
+                        (name, email, password_hash, google_id)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                """, (name, email, password_hash, google_id))
 
-    Returns:
-        Query results when requested, otherwise None.
-    """
-    with get_db() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(query, params or ())
-
-            if fetchone:
-                return cursor.fetchone()
-
-            if fetch:
-                return cursor.fetchall()
-
-            return None
-
-
-# ----------------------------------------------------------------------
-# User operations
-# ----------------------------------------------------------------------
-
-def create_user(
-    email,
-    password_hash=None,
-    name=None,
-    google_id=None,
-):
-    """
-    Create a new AERIS user.
-
-    Returns the newly created user's database row.
-    """
-    user_id = str(uuid.uuid4())
-
-    query = """
-        INSERT INTO users (
-            id,
-            email,
-            password_hash,
-            name,
-            google_id,
-            created_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s)
-        RETURNING
-            id,
-            email,
-            password_hash,
-            name,
-            google_id,
-            created_at
-    """
-
-    now = datetime.now(timezone.utc)
-
-    return execute_query(
-        query,
-        (
-            user_id,
-            email.strip().lower(),
-            password_hash,
-            name,
-            google_id,
-            now,
-        ),
-        fetchone=True,
-    )
-
-
-def get_user_by_id(user_id):
-    """
-    Retrieve a user by their unique ID.
-    """
-    query = """
-        SELECT
-            id,
-            email,
-            password_hash,
-            name,
-            google_id,
-            created_at
-        FROM users
-        WHERE id = %s
-        LIMIT 1
-    """
-
-    return execute_query(
-        query,
-        (str(user_id),),
-        fetchone=True,
-    )
-
-
-def get_user_by_email(email):
-    """
-    Retrieve a user using their email address.
-    """
-    if not email:
-        return None
-
-    query = """
-        SELECT
-            id,
-            email,
-            password_hash,
-            name,
-            google_id,
-            created_at
-        FROM users
-        WHERE LOWER(email) = LOWER(%s)
-        LIMIT 1
-    """
-
-    return execute_query(
-        query,
-        (email.strip(),),
-        fetchone=True,
-    )
-
-
-def get_user_by_google_id(google_id):
-    """
-    Retrieve a user using their Google OAuth subject ID.
-    """
-    if not google_id:
-        return None
-
-    query = """
-        SELECT
-            id,
-            email,
-            password_hash,
-            name,
-            google_id,
-            created_at
-        FROM users
-        WHERE google_id = %s
-        LIMIT 1
-    """
-
-    return execute_query(
-        query,
-        (google_id,),
-        fetchone=True,
-    )
-
-
-# ----------------------------------------------------------------------
-# Analysis history operations
-# ----------------------------------------------------------------------
-
-def create_analysis_record(
-    user_id,
-    analysis_type,
-    filename=None,
-    status="completed",
-    total_observations=None,
-    anomalies_detected=None,
-    anomaly_rate=None,
-    features_used=None,
-    method=None,
-    method_description=None,
-    file_path=None,
-    result_data=None,
-):
-    """
-    Store metadata and results for a completed AERIS analysis.
-
-    Large source files are not stored in PostgreSQL. The database
-    stores metadata, metrics and explainable result information.
-    """
-    analysis_id = str(uuid.uuid4())
-
-    query = """
-        INSERT INTO analysis_history (
-            id,
-            user_id,
-            analysis_type,
-            filename,
-            status,
-            total_observations,
-            anomalies_detected,
-            anomaly_rate,
-            features_used,
-            method,
-            method_description,
-            file_path,
-            result_data,
-            created_at
-        )
-        VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s
-        )
-        RETURNING *
-    """
-
-    now = datetime.now(timezone.utc)
-
-    return execute_query(
-        query,
-        (
-            analysis_id,
-            str(user_id),
-            analysis_type,
-            filename,
-            status,
-            total_observations,
-            anomalies_detected,
-            anomaly_rate,
-            features_used,
-            method,
-            method_description,
-            file_path,
-            result_data,
-            now,
-        ),
-        fetchone=True,
-    )
-
-
-def get_analysis_history(
-    user_id,
-    analysis_type=None,
-    search=None,
-):
-    """
-    Retrieve analysis history for a particular user.
-
-    Optional filtering can be applied by analysis type and filename.
-    """
-    conditions = ["user_id = %s"]
-    params = [str(user_id)]
-
-    if analysis_type:
-        conditions.append("analysis_type = %s")
-        params.append(analysis_type)
-
-    if search:
-        conditions.append("filename ILIKE %s")
-        params.append(f"%{search}%")
-
-    query = f"""
-        SELECT *
-        FROM analysis_history
-        WHERE {" AND ".join(conditions)}
-        ORDER BY created_at DESC
-    """
-
-    return execute_query(
-        query,
-        tuple(params),
-        fetch=True,
-    )
-
-
-def get_analysis_by_id(analysis_id, user_id=None):
-    """
-    Retrieve one analysis record.
-
-    When user_id is supplied, the query also verifies ownership.
-    """
-    if user_id is not None:
-        query = """
-            SELECT *
-            FROM analysis_history
-            WHERE id = %s
-              AND user_id = %s
-            LIMIT 1
-        """
-
-        return execute_query(
-            query,
-            (str(analysis_id), str(user_id)),
-            fetchone=True,
-        )
-
-    query = """
-        SELECT *
-        FROM analysis_history
-        WHERE id = %s
-        LIMIT 1
-    """
-
-    return execute_query(
-        query,
-        (str(analysis_id),),
-        fetchone=True,
-    )
-
-
-def delete_analysis_record(analysis_id, user_id):
-    """
-    Delete an analysis-history record belonging to the specified user.
-
-    The actual uploaded source file can be removed separately by the
-    route handling the request.
-    """
-    query = """
-        DELETE FROM analysis_history
-        WHERE id = %s
-          AND user_id = %s
-    """
-
-    execute_query(
-        query,
-        (str(analysis_id), str(user_id)),
-    )
-
-
-# ----------------------------------------------------------------------
-# Dashboard statistics
-# ----------------------------------------------------------------------
-
-def get_dashboard_statistics(user_id):
-    """
-    Calculate summary statistics for the authenticated user's
-    dashboard.
-    """
-    query = """
-        SELECT
-            COUNT(*) AS total_analyses,
-
-            COUNT(*) FILTER (
-                WHERE analysis_type = 'telemetry'
-            ) AS telemetry_analyses,
-
-            COUNT(*) FILTER (
-                WHERE analysis_type = 'image'
-            ) AS image_analyses,
-
-            COALESCE(
-                SUM(anomalies_detected) FILTER (
-                    WHERE analysis_type = 'telemetry'
-                ),
-                0
-            ) AS total_anomalies
-
-        FROM analysis_history
-        WHERE user_id = %s
-    """
-
-    result = execute_query(
-        query,
-        (str(user_id),),
-        fetchone=True,
-    )
+            result = cur.fetchone()
 
     if not result:
-        return {
-            "total_analyses": 0,
-            "telemetry_analyses": 0,
-            "image_analyses": 0,
-            "total_anomalies": 0,
-        }
+        raise RuntimeError("User creation returned no ID.")
 
-    return dict(result)
+    return result["id"]
 
 
-def get_recent_analyses(user_id, limit=5):
-    """
-    Return the user's most recent analysis records.
-    """
-    # Keep the limit controlled by the application rather than allowing
-    # arbitrary SQL fragments from user input.
-    limit = max(1, min(int(limit), 50))
+def init_db():
+    user_id_type = get_user_id_type()
 
-    query = f"""
-        SELECT *
-        FROM analysis_history
-        WHERE user_id = %s
-        ORDER BY created_at DESC
-        LIMIT {limit}
-    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            if user_id_type is None:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS public.users (
+                        id UUID PRIMARY KEY,
+                        name VARCHAR(150),
+                        email VARCHAR(320) NOT NULL UNIQUE,
+                        password_hash TEXT,
+                        google_id VARCHAR(255) UNIQUE,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        CONSTRAINT users_email_not_blank
+                            CHECK (length(trim(email)) > 0)
+                    );
+                """)
+                user_id_type = "uuid"
 
-    return execute_query(
-        query,
-        (str(user_id),),
-        fetch=True,
-    )
+            if user_id_type == "uuid":
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS public.analysis_history (
+                        id UUID PRIMARY KEY,
+                        user_id UUID NOT NULL
+                            REFERENCES public.users(id) ON DELETE CASCADE,
+                        analysis_type VARCHAR(30) NOT NULL
+                            CONSTRAINT analysis_type_valid
+                                CHECK (analysis_type IN ('telemetry', 'image')),
+                        filename VARCHAR(255),
+                        status VARCHAR(30) NOT NULL DEFAULT 'completed'
+                            CONSTRAINT analysis_status_valid
+                                CHECK (status IN ('processing', 'completed', 'failed')),
+                        total_observations INTEGER,
+                        anomalies_detected INTEGER,
+                        anomaly_rate DOUBLE PRECISION,
+                        features_used INTEGER,
+                        method VARCHAR(100),
+                        method_description TEXT,
+                        file_path TEXT,
+                        result_data JSONB,
+                        plain_language_explanation TEXT,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        CONSTRAINT anomaly_rate_valid CHECK (
+                            anomaly_rate IS NULL OR
+                            (anomaly_rate >= 0 AND anomaly_rate <= 100)
+                        ),
+                        CONSTRAINT total_observations_valid CHECK (
+                            total_observations IS NULL OR total_observations >= 0
+                        ),
+                        CONSTRAINT anomalies_detected_valid CHECK (
+                            anomalies_detected IS NULL OR anomalies_detected >= 0
+                        ),
+                        CONSTRAINT features_used_valid CHECK (
+                            features_used IS NULL OR features_used >= 0
+                        )
+                    );
+                """)
+                cur.execute("""
+                    ALTER TABLE public.analysis_history
+                    ADD COLUMN IF NOT EXISTS plain_language_explanation TEXT;
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_analysis_user_id
+                    ON public.analysis_history(user_id);
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_analysis_created_at
+                    ON public.analysis_history(created_at DESC);
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_analysis_type
+                    ON public.analysis_history(analysis_type);
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_analysis_status
+                    ON public.analysis_history(status);
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_analysis_result_data
+                    ON public.analysis_history USING GIN(result_data);
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_users_email
+                    ON public.users(email);
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_users_google_id
+                    ON public.users(google_id);
+                """)
+            elif user_id_type in {"integer", "bigint", "smallint"}:
+                user_id_sql_type = {
+                    "integer": "INTEGER",
+                    "bigint": "BIGINT",
+                    "smallint": "SMALLINT",
+                }[user_id_type]
+                cur.execute(f"""
+                    CREATE TABLE IF NOT EXISTS public.analyses (
+                        id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                        user_id {user_id_sql_type} NOT NULL
+                            REFERENCES public.users(id) ON DELETE CASCADE,
+                        filename VARCHAR(255) NOT NULL,
+                        analysis_type VARCHAR(30) NOT NULL,
+                        observations INTEGER DEFAULT 0,
+                        anomaly_count INTEGER DEFAULT 0,
+                        anomaly_percentage DOUBLE PRECISION DEFAULT 0,
+                        summary TEXT NOT NULL,
+                        plain_language_explanation TEXT,
+                        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                cur.execute("""
+                    ALTER TABLE public.analyses
+                    ADD COLUMN IF NOT EXISTS plain_language_explanation TEXT;
+                """)
+            else:
+                raise RuntimeError(
+                    f"Unsupported users.id database type: {user_id_type}"
+                )
+
+        conn.commit()
+
+
+def save_analysis(
+    user_id,
+    filename,
+    analysis_type,
+    observations,
+    anomaly_count,
+    anomaly_percentage,
+    summary,
+    plain_language_explanation=None,
+):
+    id_type = get_user_id_type()
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            if id_type == "uuid":
+                analysis_id = uuid.uuid4()
+                cur.execute("""
+                    INSERT INTO analysis_history (
+                        id, user_id, analysis_type, filename,
+                        total_observations, anomalies_detected, anomaly_rate,
+                        method, method_description, result_data,
+                        plain_language_explanation
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """, (
+                    analysis_id,
+                    uuid.UUID(str(user_id)),
+                    analysis_type.lower(),
+                    filename,
+                    observations,
+                    anomaly_count,
+                    anomaly_percentage,
+                    "IsolationForest" if analysis_type.lower() == "telemetry"
+                    else "OpenCV image metrics",
+                    summary,
+                    Jsonb({"summary": summary}),
+                    plain_language_explanation,
+                ))
+            else:
+                cur.execute("""
+                    INSERT INTO analyses (
+                        user_id, filename, analysis_type, observations,
+                        anomaly_count, anomaly_percentage, summary,
+                        plain_language_explanation
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """, (
+                    int(user_id),
+                    filename,
+                    analysis_type,
+                    observations,
+                    anomaly_count,
+                    anomaly_percentage,
+                    summary,
+                    plain_language_explanation,
+                ))
+
+            result = cur.fetchone()
+
+        conn.commit()
+        return result["id"]
+
+
+def delete_analysis(user_id, analysis_id):
+    id_type = get_user_id_type()
+
+    if id_type == "uuid":
+        table = "public.analysis_history"
+        record_id = uuid.UUID(str(analysis_id))
+        owner_id = uuid.UUID(str(user_id))
+    elif id_type in {"integer", "bigint", "smallint"}:
+        table = "public.analyses"
+        record_id = int(analysis_id)
+        owner_id = int(user_id)
+    else:
+        raise RuntimeError(f"Unsupported users.id database type: {id_type}")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"DELETE FROM {table} WHERE id = %s AND user_id = %s",
+                (record_id, owner_id),
+            )
+            deleted = cur.rowcount == 1
+        conn.commit()
+
+    return deleted
+
+
+def get_user_history(user_id, limit=None):
+    id_type = get_user_id_type()
+    if id_type == "uuid":
+        query = """
+            SELECT
+                id,
+                user_id,
+                filename,
+                INITCAP(analysis_type) AS analysis_type,
+                total_observations AS observations,
+                anomalies_detected AS anomaly_count,
+                anomaly_rate AS anomaly_percentage,
+                COALESCE(result_data ->> 'summary', method_description, '') AS summary,
+                plain_language_explanation,
+                created_at
+            FROM analysis_history
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+        """
+        user_id = uuid.UUID(str(user_id))
+    else:
+        query = """
+            SELECT
+                id, user_id, filename, analysis_type, observations,
+                anomaly_count, anomaly_percentage, summary,
+                plain_language_explanation, created_at
+            FROM analyses
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+        """
+        user_id = int(user_id)
+
+    params = [user_id]
+
+    if limit is not None:
+        query += " LIMIT %s"
+        params.append(limit)
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            return cur.fetchall()
+

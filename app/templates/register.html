@@ -1,0 +1,72 @@
+
+{% extends "base.html" %}
+
+{% block title %}Create Account | AERIS{% endblock %}
+
+{% block content %}
+
+<section class="auth-container">
+
+    <div class="auth-card">
+
+        <p class="eyebrow">JOIN AERIS</p>
+
+        <h1>Create Account</h1>
+
+        <p class="muted">
+            Create your account to begin aerospace data analysis.
+        </p>
+
+        <form method="POST" action="{{ url_for('auth.register') }}">
+
+            <label for="name">Full Name</label>
+
+            <input
+                type="text"
+                id="name"
+                name="name"
+                placeholder="Your name"
+                autocomplete="name"
+                maxlength="100"
+                required
+            >
+
+            <label for="email">Email Address</label>
+
+            <input
+                type="email"
+                id="email"
+                name="email"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required
+            >
+
+            <label for="password">Password</label>
+
+            <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="Minimum 8 characters"
+                autocomplete="new-password"
+                minlength="8"
+                required
+            >
+
+            <button type="submit" class="btn btn-primary">
+                Create Account
+            </button>
+
+        </form>
+
+        <p class="auth-footer">
+            Already registered?
+            <a href="{{ url_for('auth.login') }}">Sign In</a>
+        </p>
+
+    </div>
+
+</section>
+
+{% endblock %}

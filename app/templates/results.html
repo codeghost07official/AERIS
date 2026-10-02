@@ -1,0 +1,159 @@
+
+{% extends "base.html" %}
+
+{% block title %}Analysis Results | AERIS{% endblock %}
+
+{% block content %}
+
+<section class="results-header">
+    <p class="eyebrow">ANALYSIS REPORT</p>
+    <h1>Analysis Complete</h1>
+    <p class="muted">
+        File: {{ filename }}
+    </p>
+    <span class="result-tag">{{ analysis_type }}</span>
+</section>
+
+{% if analysis_type == "Telemetry" %}
+
+<section class="stats-grid">
+
+    <div class="stat-card">
+        <span class="stat-label">Observations</span>
+        <h2>{{ result.observations }}</h2>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Detected Anomalies</span>
+        <h2>{{ result.anomaly_count }}</h2>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Anomaly Percentage</span>
+        <h2>{{ result.anomaly_percentage }}%</h2>
+    </div>
+
+</section>
+
+<section class="panel">
+    <p class="eyebrow">MODEL FINDING</p>
+    <h2>{{ result.finding }}</h2>
+
+    <p class="muted">
+        {{ result.interpretation }}
+    </p>
+</section>
+
+<section class="panel">
+    <h2>Telemetry Anomaly Distribution</h2>
+
+    <canvas id="telemetryChart"
+            height="110"
+            data-labels='{{ result.chart_data.labels | tojson }}'
+            data-anomalies='{{ result.chart_data.anomalies | tojson }}'>
+    </canvas>
+
+    <p class="muted">
+        Each point represents an observation. A value of 1 indicates
+        a detected anomaly; 0 indicates a non-anomalous observation.
+    </p>
+</section>
+
+<section class="panel">
+    <h2>Numerical Parameter Statistics</h2>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Mean</th>
+                    <th>Minimum</th>
+                    <th>Maximum</th>
+                    <th>Standard Deviation</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for column, stats in result.column_stats.items() %}
+                    <tr>
+                        <td>{{ column }}</td>
+                        <td>{{ stats.mean }}</td>
+                        <td>{{ stats.min }}</td>
+                        <td>{{ stats.max }}</td>
+                        <td>{{ stats.std }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% else %}
+
+<section class="stats-grid">
+
+    <div class="stat-card">
+        <span class="stat-label">Image Dimensions</span>
+        <h2>{{ result.width }} × {{ result.height }}</h2>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Brightness</span>
+        <h2>{{ result.brightness }}</h2>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Contrast</span>
+        <h2>{{ result.contrast }}</h2>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Sharpness</span>
+        <h2>{{ result.sharpness }}</h2>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Edge Density</span>
+        <h2>{{ result.edge_density }}%</h2>
+    </div>
+
+</section>
+
+<section class="panel">
+    <p class="eyebrow">IMAGE INTERPRETATION</p>
+    <h2>Image Characteristics</h2>
+
+    <p>{{ result.brightness_note }}</p>
+    <p>{{ result.contrast_note }}</p>
+    <p>{{ result.sharpness_note }}</p>
+    <p>{{ result.edge_note }}</p>
+
+    <p class="muted">{{ result.interpretation }}</p>
+</section>
+
+{% endif %}
+
+<section class="panel insight-panel">
+    <p class="eyebrow">AERIS INSIGHT</p>
+    <h2>Summary</h2>
+    <p>{{ result.summary }}</p>
+    {% if result.plain_language_explanation %}
+        <h3>In everyday terms</h3>
+        <p class="muted">{{ result.plain_language_explanation }}</p>
+    {% endif %}
+</section>
+
+<div class="action-row">
+    <a href="{{ url_for('main.dashboard') }}"
+       class="btn btn-primary">
+        Back to Dashboard
+    </a>
+
+    <a href="{{ url_for('main.history') }}"
+       class="btn btn-secondary">
+        View History
+    </a>
+</div>
+
+{% endblock %}
