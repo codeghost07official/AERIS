@@ -520,7 +520,7 @@ Then open the app in a browser, usually at:
 - `http://127.0.0.1:5000`
 
 The development server uses `PORT` when it is set and otherwise listens on port
-5000. The `PORT` setting is supplied automatically by Railway.
+5000. The `PORT` setting is supplied automatically by the hosting platform.
 
 ---
 
@@ -560,25 +560,31 @@ python run.py
 This starts the Flask development server on `0.0.0.0` using `PORT` (5000 when
 the variable is not set).
 
-### Railway deployment
+### Render deployment
 
-Railway uses the included `Procfile` to start the application with Gunicorn.
-The service listens on Railway's assigned `$PORT`; it does not use Flask's
-development server. Python is pinned to 3.12 by `.python-version`.
+Create a Render **Web Service** for this repository and use these commands:
 
-Configure these Railway variables:
+- Build command: `pip install -r requirements.txt`
+- Start command: `gunicorn --bind 0.0.0.0:$PORT run:app`
+
+The start command runs the Flask WSGI application with Gunicorn on Render's
+assigned port. The included `Procfile` contains the same start command for
+platforms that use Procfiles; enter the start command explicitly in Render's
+service settings. Python is pinned to 3.12 by `.python-version`.
+
+Configure these Render environment variables:
 
 - `SECRET_KEY`: a strong, randomly generated value.
 - `DATABASE_URL`: the existing Neon PostgreSQL connection string (including its SSL setting, such as `sslmode=require`).
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: if Google sign-in is enabled.
 - `SESSION_COOKIE_SECURE`: `true` to restrict session cookies to HTTPS.
-- `GOOGLE_REDIRECT_URI`: optional; set it to `https://<your-railway-domain>/google/callback` to explicitly pin the callback URL.
+- `GOOGLE_REDIRECT_URI`: optional; set it to `https://<your-render-service>.onrender.com/google/callback` to explicitly pin the callback URL.
 
-After Railway provides a domain, add
-`https://<your-railway-domain>/google/callback` to the authorized redirect URIs
-for the Google OAuth client. Uploads are stored temporarily and removed after
-analysis; the application does not depend on deployment storage persisting
-uploaded files.
+After Render provides the public URL, add
+`https://<your-render-service>.onrender.com/google/callback` (or the equivalent
+URL for your custom domain) to the authorized redirect URIs for the Google
+OAuth client. Uploads are stored temporarily and removed after analysis; the
+application does not depend on deployment storage persisting uploaded files.
 
 ---
 
