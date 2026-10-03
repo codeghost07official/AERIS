@@ -7,14 +7,14 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from dotenv import load_dotenv
 
-load_dotenv(".env")
+load_dotenv()
 
 
 def get_db_connection():
     database_url = os.getenv("DATABASE_URL")
 
     if not database_url:
-        raise RuntimeError("DATABASE_URL is missing from .env")
+        raise RuntimeError("DATABASE_URL environment variable is required.")
 
     return psycopg.connect(
         database_url,
@@ -322,4 +322,3 @@ def get_user_history(user_id, limit=None):
         with conn.cursor() as cur:
             cur.execute(query, params)
             return cur.fetchall()
-

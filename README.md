@@ -474,7 +474,7 @@ Follow these general steps to set up the project on a local machine or other com
 
 ### 13.1 Prerequisites
 
-- Python 3.8 or newer (the project is designed for modern Python compatible with the dependencies)
+- Python 3.12
 - PostgreSQL database access
 - A configured environment for environment variables
 - Internet access if Google OAuth is enabled
@@ -495,13 +495,13 @@ python -m pip install -r requirements.txt
 
 ### 13.4 Configure environment variables
 
-Create a `.env` file in the project root and define the required settings. The project expects values for:
+Create a `.env` file in the project root and define the required settings:
 
 - `SECRET_KEY`
 - `DATABASE_URL`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- optionally `FLASK_APP` and `FLASK_ENV`
+
+Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` if Google sign-in is enabled.
+Use a strong, randomly generated `SECRET_KEY`; there is no built-in default.
 
 Do not commit real secrets to version control. Use secure values in local or hosted environments.
 
@@ -519,6 +519,9 @@ Then open the app in a browser, usually at:
 
 - `http://127.0.0.1:5000`
 
+The development server uses `PORT` when it is set and otherwise listens on port
+5000. The `PORT` setting is supplied automatically by Railway.
+
 ---
 
 ## 14. Environment Variables and Configuration Requirements
@@ -529,14 +532,15 @@ The project relies on environment variables from `.env`.
 
 - `DATABASE_URL`: PostgreSQL connection string for the application database.
 - `SECRET_KEY`: used by Flask for sessions and secure application behavior.
-- `GOOGLE_CLIENT_ID`: Google OAuth client ID.
-- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret.
 
 ### Optional or supporting variables
 
 - `FLASK_APP`: used by Flask conventions.
 - `FLASK_ENV`: used to indicate development or deployment context.
-- `UPLOAD_FOLDER`: by default the project uses `app/static/uploads`.
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: required only when Google sign-in is used.
+- `GOOGLE_REDIRECT_URI`: optional explicit Google OAuth callback URL; if omitted, it is generated from the incoming request.
+- `SESSION_COOKIE_SECURE`: set to `true` when serving the site over HTTPS.
+- `UPLOAD_FOLDER`: optional temporary upload directory; defaults to the operating system's temporary directory.
 - `MAX_CONTENT_LENGTH`: set to 16 MB in the app config.
 
 The application reads these variables using `python-dotenv` and the project is designed to work with a standard environment file rather than hard-coded secrets.
@@ -553,9 +557,28 @@ From the project root:
 python run.py
 ```
 
-This runs the Flask application with the host set to `127.0.0.1` and port `5000`.
+This starts the Flask development server on `0.0.0.0` using `PORT` (5000 when
+the variable is not set).
 
-For production-style deployment, the project also includes `gunicorn` in the dependencies, but the repository itself does not enforce any single hosting setup. The application is intentionally kept flexible so it can be deployed to different environments.
+### Railway deployment
+
+Railway uses the included `Procfile` to start the application with Gunicorn.
+The service listens on Railway's assigned `$PORT`; it does not use Flask's
+development server. Python is pinned to 3.12 by `.python-version`.
+
+Configure these Railway variables:
+
+- `SECRET_KEY`: a strong, randomly generated value.
+- `DATABASE_URL`: the existing Neon PostgreSQL connection string (including its SSL setting, such as `sslmode=require`).
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: if Google sign-in is enabled.
+- `SESSION_COOKIE_SECURE`: `true` to restrict session cookies to HTTPS.
+- `GOOGLE_REDIRECT_URI`: optional; set it to `https://<your-railway-domain>/google/callback` to explicitly pin the callback URL.
+
+After Railway provides a domain, add
+`https://<your-railway-domain>/google/callback` to the authorized redirect URIs
+for the Google OAuth client. Uploads are stored temporarily and removed after
+analysis; the application does not depend on deployment storage persisting
+uploaded files.
 
 ---
 

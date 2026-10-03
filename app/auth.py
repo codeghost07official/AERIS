@@ -122,9 +122,8 @@ def login():
 @auth.route("/google")
 def google_login():
 
-    redirect_uri = url_for(
-        "auth.google_callback",
-        _external=True,
+    redirect_uri = current_app.config["GOOGLE_REDIRECT_URI"] or url_for(
+        "auth.google_callback", _external=True
     )
 
     return google.authorize_redirect(redirect_uri)
@@ -216,4 +215,3 @@ def logout():
     flash("You have been logged out.", "success")
 
     return redirect(url_for("auth.login"))
-
